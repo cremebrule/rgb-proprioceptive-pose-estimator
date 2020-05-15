@@ -45,8 +45,8 @@ env = suite.make(
 
 # Define loss criterion
 criterion = {
-    "x0_loss": nn.MSELoss(),
-    "x1_loss": nn.MSELoss(),
+    "x0_loss": nn.MSELoss(reduction='sum'),
+    "x1_loss": nn.MSELoss(reduction='sum'),
 }
 
 
