@@ -58,6 +58,9 @@ class NaiveEndEffectorStateEstimator(nn.Module):
 
         self.n_post_hidden = len(post_hidden_dims) - 1
 
+        # Set rollout to false by default
+        self.rollout = False
+
     def forward(self, img, self_measurement):
         """
         Forward pass for this model

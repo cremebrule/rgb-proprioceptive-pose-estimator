@@ -61,6 +61,9 @@ class TemporallyDependentStateEstimator(nn.Module):
         self.pre_out_vec = None
         self.post_out_vec = None
 
+        # Set rollout to false by default
+        self.rollout = False
+
     def forward(self, img, self_measurement):
         """
         Forward pass for this model
@@ -89,7 +92,13 @@ class TemporallyDependentStateEstimator(nn.Module):
         features_copy = features.clone()
 
         # Pass features through RNN pre-measurement
-        pre_measurement_h, _ = self.pre_measurement_rnn(features)  # Output shape (S, N, pre_hidden_dim)
+        if not self.rollout:
+            pre_measurement_h, _ = self.pre_measurement_rnn(features)  # Output shape (S, N, pre_hidden_dim)
+        else:
+            pre_measurement_h, (new_h, new_c) = self.pre_measurement_rnn(features, (
+                self.pre_measurement_h, self.pre_measurement_c))
+            self.pre_measurement_h = new_h
+            self.pre_measurement_c = new_c
         #pre_measurement_h, (pre_h_t, pre_c_t) = self.pre_measurement_rnn(features, (self.pre_measurement_h[-1], self.pre_measurement_c[-1]))      # Output shape (S, N, pre_hidden_dim)
 
         #self.pre_measurement_h.append(pre_h_t)
@@ -102,10 +111,17 @@ class TemporallyDependentStateEstimator(nn.Module):
         measurement_diff = pre_out - self_measurement
 
         # Concatenate features with diff measurement
-        post_in = torch.cat([features_copy, measurement_diff], dim=2)   # Output shape (S, N, latent_dim + 7)
+        post_in = torch.cat([features_copy, measurement_diff], dim=-1)   # Output shape (S, N, latent_dim + 7)
+
 
         # Pass features through RNN + FC pre-measurement
-        post_measurement_h, _ = self.post_measurement_rnn(post_in)  # Output shape (S, N, post_hidden_dim)
+        if not self.rollout:
+            post_measurement_h, _ = self.post_measurement_rnn(post_in)  # Output shape (S, N, post_hidden_dim)
+        else:
+            post_measurement_h, (new_h, new_c) = self.post_measurement_rnn(post_in, (
+                self.post_measurement_h, self.post_measurement_c))
+            self.post_measurement_h = new_h
+            self.post_measurement_c = new_c
         #post_measurement_h, (post_h_t, post_c_t) = self.post_measurement_rnn(post_in, (self.post_measurement_h[-1], self.post_measurement_c[-1]))      # Output shape (S, N, post_hidden_dim)
 
         #self.post_measurement_h.append(post_h_t)
@@ -125,10 +141,10 @@ class TemporallyDependentStateEstimator(nn.Module):
         Args:
             batch_size (int): Batch size currently being run
         """
-        self.pre_measurement_h = [torch.zeros((1, batch_size, self.pre_measurement_hidden_dim), requires_grad=False)]
-        self.pre_measurement_c = [torch.zeros((1, batch_size, self.pre_measurement_hidden_dim), requires_grad=False)]
-        self.post_measurement_h = [torch.zeros((1, batch_size, self.post_measurement_hidden_dim), requires_grad=False)]
-        self.post_measurement_c = [torch.zeros((1, batch_size, self.post_measurement_hidden_dim), requires_grad=False)]
+        self.pre_measurement_h = torch.zeros((1, batch_size, self.pre_measurement_hidden_dim), requires_grad=False)
+        self.pre_measurement_c = torch.zeros((1, batch_size, self.pre_measurement_hidden_dim), requires_grad=False)
+        self.post_measurement_h = torch.zeros((1, batch_size, self.post_measurement_hidden_dim), requires_grad=False)
+        self.post_measurement_c = torch.zeros((1, batch_size, self.post_measurement_hidden_dim), requires_grad=False)
 
         self.pre_out_vec = []
         self.post_out_vec = []

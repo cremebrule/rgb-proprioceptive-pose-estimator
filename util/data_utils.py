@@ -2,7 +2,6 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 import numpy as np
 import torch
-from PIL import Image
 
 
 class MultiEpisodeDataset(Dataset):
@@ -102,7 +101,7 @@ class MultiEpisodeDataset(Dataset):
                 # Renormalize the orientation part
                 mag = np.linalg.norm(x0bar[3:])
                 x0bar[3:] /= mag
-                measurement_self.append(x0 + x0bar)
+                measurement_self.append(x0bar)
                 true_self.append(x0)
                 true_other.append(np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]]))
 

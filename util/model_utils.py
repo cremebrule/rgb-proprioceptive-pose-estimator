@@ -202,6 +202,86 @@ def train(
     return model, val_history
 
 
+def rollout(
+        model,
+        env,
+        params,
+        ):
+    """
+    Performs training for a given model for a specified number of epochs.
+
+    Args:
+        model (nn.Module): Model to train
+        env (MujocoEnv): robosuite environment to run simulation from
+        params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
+
+    Returns:
+        None
+    """
+
+    # Create image pre-processor
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+
+    # Get action limits
+    low, high = env.action_spec
+
+    # Set model mode to rollout
+    model.eval()
+    model.rollout = True
+
+    # Get variable to know when robosuite env is done
+    while(True):    # Run indefinitely
+        # Reset env
+        env.reset()
+
+        # Reset model internals
+        model.reset_initial_state(batch_size=1)
+
+        # Variable to know when episode is done
+        done = False
+
+        while not done:
+            # Take a random step in the environment
+            action = np.random.uniform(low, high)
+            obs, reward, done, _ = env.step(action)
+
+            # Get relevant observations
+            # Need to preprocess image first before appending
+            img = obs[params["camera_name"] + "_image"]
+            img = transform(img).float()
+            x0 = np.concatenate([obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
+            x0bar = x0 + np.random.multivariate_normal(mean=np.zeros(7), cov=np.eye(7) * params["noise_scale"])
+            # Renormalize the orientation part
+            mag = np.linalg.norm(x0bar[3:])
+            x0bar[3:] /= mag
+            measurement_self = x0bar
+            true_self = x0
+            true_other = np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]])
+
+            # Convert inputs to tensors
+            img = img.unsqueeze(dim=0).unsqueeze(dim=0)
+            measurement_self = torch.tensor(measurement_self, dtype=torch.float, requires_grad=False).unsqueeze(dim=0).unsqueeze(dim=0)
+            true_self = torch.tensor(true_self, dtype=torch.float, requires_grad=False).unsqueeze(dim=0).unsqueeze(dim=0)
+            true_other = torch.tensor(true_other, dtype=torch.float, requires_grad=False).unsqueeze(dim=0).unsqueeze(dim=0)
+
+            # Now run forward pass to get estimates
+            x0_out, x1_out = model(img, measurement_self)
+
+            x1_pos = x1_out.squeeze().detach().numpy()[:3]
+
+            # Set the indicator object to this xyz location to visualize
+            env.move_indicator(x1_pos)
+
+            # Lastly, render
+            env.render()
+
+
 def set_parameter_requires_grad(model, feature_extracting):
     if feature_extracting:
         for param in model.parameters():
