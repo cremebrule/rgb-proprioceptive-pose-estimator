@@ -9,6 +9,7 @@ import torchvision
 from torchvision import datasets, models, transforms
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
+from datetime import datetime
 import time
 import os
 import copy
@@ -48,6 +49,9 @@ def train(
         model (nn.Module): Model with best results
         val_history (list): List of statistics over training run
     """
+    # Get exact date and time to save model
+    now = datetime.now()
+    dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
 
     # Create variable for storing current time
     since = time.time()
@@ -172,11 +176,12 @@ def train(
                     # Save it to specified path
                     if save_path == 'default':
                         fdir = os.path.dirname(os.path.abspath(__file__))
-                        save_path = os.path.join(fdir, '../log/runs/{}_{}_{}hzn_{}ep.pth'.format(
+                        save_path = os.path.join(fdir, '../log/runs/{}_{}_{}hzn_{}ep_{}.pth'.format(
                             type(model).__name__,
                             type(dataset.env).__name__,
                             dataset.env.horizon,
-                            num_epochs*num_train_episodes_per_epoch)
+                            num_epochs*num_train_episodes_per_epoch,
+                            dt_string),
                                                  )
 
                     # Make sure path exists, if not, create the nested directory to the location
