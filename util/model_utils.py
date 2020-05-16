@@ -7,6 +7,7 @@ import torch.optim as optim
 import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
+from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 import time
 import os
@@ -23,7 +24,8 @@ def train(
         num_val_episodes_per_epoch,
         params,
         device,
-        save_path='default'
+        save_path='default',
+        logging=True
         ):
     """
     Performs training for a given model for a specified number of epochs.
@@ -40,6 +42,7 @@ def train(
         params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
         device (str): Device to send model to for computations. Can be "cpu" or "cuda:X"
         save_path (str): filepath to where best model state dict will be periodically saved
+        logging (bool): Whether we are logging our results via Tensorboard SummaryWriter or not
 
     Returns:
         model (nn.Module): Model with best results
@@ -55,6 +58,9 @@ def train(
     # Store best model and its performance
     best_model = copy.deepcopy(model.state_dict())
     best_err = np.inf       # lower is better
+
+    # Logging if requested
+    writer = SummaryWriter() if logging else None
 
     # Load data into dataloader
     batch_size = model.sequence_length if model.requires_sequence else 1
@@ -134,12 +140,21 @@ def train(
                 running_loss += loss.item()
                 running_err += loss_x1.item()
 
-            # Determine overall epoch loss and performance
-            epoch_loss = running_loss / len(dataloader.dataset)
-            epoch_err = running_err / len(dataloader.dataset)
+            # Determine overall epoch loss and performance (this is the per-step loss / err averaged over entire epoch)
+            epoch_loss = running_loss / (len(dataloader.dataset) * num_episodes)
+            epoch_err = running_err / (len(dataloader.dataset) * num_episodes)
 
             # Determine current time
             time_elapsed = time.time() - since
+
+            # Add logging stats
+            if logging:
+                if phase == 'train':
+                    writer.add_scalar("Loss/train", epoch_loss, int(time_elapsed))
+                    writer.add_scalar("Err/train", epoch_err, int(time_elapsed))
+                else:  # validation phase
+                    writer.add_scalar("Loss/val", epoch_loss, int(time_elapsed))
+                    writer.add_scalar("Err/val", epoch_err, int(time_elapsed))
 
             # Print out the stats for this epoch
             print('{} Loss: {:.4f}, Err: {:.4f}. Time elapsed = {:.0f}m {:.0f}s'.format(

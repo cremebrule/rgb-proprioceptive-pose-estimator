@@ -1,3 +1,5 @@
 robosuite
 torch
+torchvision
+tensorboard
 mujoco-py==2.0.2.9
