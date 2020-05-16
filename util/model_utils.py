@@ -83,7 +83,15 @@ def train(
             # Grab new data from dataset
             dataloader.dataset.refresh_data(num_episodes, params["camera_name"], params["noise_scale"])
 
+            # Reset model
+            model.reset_initial_state(num_episodes)
+
+            # Setup arrays to hold model outputs over the episode
+            x0_out_vec = []
+            x1_out_vec = []
+
             # Now iterate over data
+            print("Running {}...".format(phase))
             for img, x0bar, x0, x1 in dataloader:
                 # Pass all inputs to specified device (cpu or gpu) and squeeze 1st dim
                 img = torch.squeeze(img.to(device), dim=0)
@@ -93,6 +101,8 @@ def train(
 
                 # Zero out the parameter gradients
                 optimizer.zero_grad()
+
+                torch.autograd.set_detect_anomaly(True)
 
                 # Run the forward pass, and only track gradients if we're in the training mode
                 with torch.set_grad_enabled(phase == 'train'):
@@ -108,12 +118,13 @@ def train(
 
                     # Run backward pass + optimizer step if in training phase
                     if phase == 'train':
-                        loss.backward()
+                        print("Running backward step...")
+                        loss.backward(retain_graph=True)
                         optimizer.step()
 
                 # Evaluate statistics as we go along
-                running_loss += loss.item() * x0bar.size(0)
-                running_err += loss_x1
+                running_loss += loss.item()
+                running_err += loss_x1.item()
 
             # Determine overall epoch loss and performance
             epoch_loss = running_loss / len(dataloader.dataset)
@@ -138,7 +149,7 @@ def train(
                     # Save it to specified path
                     if save_path == 'default':
                         fdir = os.path.dirname(os.path.abspath(__file__))
-                        save_path = os.path.join(fdir, '../log/runs/{}_{}ep.pth'.format(
+                        save_path = os.path.join(fdir, '../log/runs/{}_{}_{}ep.pth'.format(type(model).__name__,
                             type(dataloader.dataset.env).__name__, num_epochs*num_train_episodes_per_epoch))
 
                     # Make sure path exists, if not, create the nested directory to the location

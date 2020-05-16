@@ -102,3 +102,14 @@ class NaiveEndEffectorStateEstimator(nn.Module):
 
         # Return final output
         return pre_out, post_out
+
+    def reset_initial_state(self, batch_size):
+        """
+        Resets any initial state. Doesn't actually do anything for this class since it doesn't have any temporal
+        dependencies
+
+
+        Args:
+            batch_size (int): Batch size currently being run
+        """
+        pass

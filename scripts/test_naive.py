@@ -2,6 +2,7 @@ import robosuite as suite
 import torch
 import torch.nn as nn
 from models.naive import NaiveEndEffectorStateEstimator
+from models.time_sensitive import TemporallyDependentStateEstimator
 from util.data_utils import MultiEpisodeDataset
 from util.model_utils import train
 
@@ -22,6 +23,8 @@ num_resnet_layers = 50
 latent_dim = 256
 pre_hidden_dims = [128, 64]
 post_hidden_dims = [128, 64]
+pre_lstm_h_dim = 50
+post_lstm_h_dim = 50
 
 # Training params
 lr = 0.001
@@ -54,11 +57,17 @@ if __name__ == '__main__':
 
     # Create naive model
     print("Loading model...")
-    model = NaiveEndEffectorStateEstimator(
-        hidden_dims_pre_measurement=pre_hidden_dims,
-        hidden_dims_post_measurement=post_hidden_dims,
-        num_resnet_layers=num_resnet_layers,
-        latent_dim=latent_dim
+    #model = NaiveEndEffectorStateEstimator(
+    #    hidden_dims_pre_measurement=pre_hidden_dims,
+    #    hidden_dims_post_measurement=post_hidden_dims,
+    #    num_resnet_layers=num_resnet_layers,
+    #    latent_dim=latent_dim
+    #)
+    model = TemporallyDependentStateEstimator(
+         hidden_dim_pre_measurement=pre_lstm_h_dim,
+         hidden_dim_post_measurement=post_lstm_h_dim,
+         num_resnet_layers=num_resnet_layers,
+         latent_dim=latent_dim
     )
 
     # Define optimizer
