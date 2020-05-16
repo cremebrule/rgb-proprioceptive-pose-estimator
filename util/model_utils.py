@@ -133,7 +133,7 @@ def train(
                     # Run backward pass + optimizer step if in training phase
                     if phase == 'train':
                         #print("Running backward step...")
-                        loss.backward(retain_graph=True)
+                        loss.backward()
                         optimizer.step()
 
                 # Evaluate statistics as we go along
@@ -150,11 +150,11 @@ def train(
             # Add logging stats
             if logging:
                 if phase == 'train':
-                    writer.add_scalar("Loss/train", epoch_loss, int(time_elapsed))
-                    writer.add_scalar("Err/train", epoch_err, int(time_elapsed))
+                    writer.add_scalar("Loss/train", epoch_loss, epoch)
+                    writer.add_scalar("Err/train", epoch_err, epoch)
                 else:  # validation phase
-                    writer.add_scalar("Loss/val", epoch_loss, int(time_elapsed))
-                    writer.add_scalar("Err/val", epoch_err, int(time_elapsed))
+                    writer.add_scalar("Loss/val", epoch_loss, epoch)
+                    writer.add_scalar("Err/val", epoch_err, epoch)
 
             # Print out the stats for this epoch
             print('{} Loss: {:.4f}, Err: {:.4f}. Time elapsed = {:.0f}m {:.0f}s'.format(
