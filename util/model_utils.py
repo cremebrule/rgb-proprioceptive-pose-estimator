@@ -57,7 +57,8 @@ def train(
     best_err = np.inf       # lower is better
 
     # Load data into dataloader
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
+    batch_size = model.sequence_length if model.requires_sequence else 1
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
     # Train model over requested number of epochs
     for epoch in range(num_epochs):
@@ -93,21 +94,28 @@ def train(
             # Now iterate over data
             print("Running {}...".format(phase))
             for img, x0bar, x0, x1 in dataloader:
-                # Pass all inputs to specified device (cpu or gpu) and squeeze 1st dim
-                img = torch.squeeze(img.to(device), dim=0)
-                x0bar = torch.squeeze(x0bar.to(device), dim=0)
-                x0 = torch.squeeze(x0.to(device), dim=0)
-                x1 = torch.squeeze(x1.to(device), dim=0)
+                # Pass all inputs to specified device (cpu or gpu)
+                img = img.to(device)
+                x0bar = x0bar.to(device)
+                x0 = x0.to(device)
+                x1 = x1.to(device)
+
+                # squeeze 1st dim (only if we're not using sequences)
+                if not model.requires_sequence:
+                    img = torch.squeeze(img, dim=0)
+                    x0bar = torch.squeeze(x0bar, dim=0)
+                    x0 = torch.squeeze(x0, dim=0)
+                    x1 = torch.squeeze(x1, dim=0)
 
                 # Zero out the parameter gradients
                 optimizer.zero_grad()
 
-                torch.autograd.set_detect_anomaly(True)
+                #torch.autograd.set_detect_anomaly(True)
 
                 # Run the forward pass, and only track gradients if we're in the training mode
                 with torch.set_grad_enabled(phase == 'train'):
                     # Calculate outputs
-                    x0_out, x1_out = model(img, x0bar)
+                    x0_out, x1_out = model(img, x0bar)      # Each output is shape (S, N, 7)
 
                     # Calculate losses
                     loss_x0 = criterion["x0_loss"](x0_out, x0)
@@ -118,7 +126,7 @@ def train(
 
                     # Run backward pass + optimizer step if in training phase
                     if phase == 'train':
-                        print("Running backward step...")
+                        #print("Running backward step...")
                         loss.backward(retain_graph=True)
                         optimizer.step()
 
@@ -149,8 +157,12 @@ def train(
                     # Save it to specified path
                     if save_path == 'default':
                         fdir = os.path.dirname(os.path.abspath(__file__))
-                        save_path = os.path.join(fdir, '../log/runs/{}_{}_{}ep.pth'.format(type(model).__name__,
-                            type(dataloader.dataset.env).__name__, num_epochs*num_train_episodes_per_epoch))
+                        save_path = os.path.join(fdir, '../log/runs/{}_{}_{}hzn_{}ep.pth'.format(
+                            type(model).__name__,
+                            type(dataset.env).__name__,
+                            dataset.env.horizon,
+                            num_epochs*num_train_episodes_per_epoch)
+                                                 )
 
                     # Make sure path exists, if not, create the nested directory to the location
                     directory = os.path.dirname(save_path)

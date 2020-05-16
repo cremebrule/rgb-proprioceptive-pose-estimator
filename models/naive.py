@@ -113,3 +113,7 @@ class NaiveEndEffectorStateEstimator(nn.Module):
             batch_size (int): Batch size currently being run
         """
         pass
+
+    @property
+    def requires_sequence(self):
+        return False
