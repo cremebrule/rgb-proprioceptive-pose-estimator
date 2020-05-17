@@ -70,6 +70,9 @@ def train(
     batch_size = model.sequence_length if model.requires_sequence else 1
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
+    # Make sure to send model to appropriate device
+    model.to(device)
+
     # Print filepath we're saving model to
     print("\nFile name saved:\n{}_{}_{}hzn_{}ep_{}.pth\n".format(
                             type(model).__name__,
