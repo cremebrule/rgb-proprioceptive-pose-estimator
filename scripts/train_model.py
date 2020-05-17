@@ -35,7 +35,7 @@ post_lstm_h_dim = 50
 sequence_length = 10
 
 # Training params
-lr = 0.001
+lr = 0.01
 n_epochs = 1000
 n_train_episodes_per_epoch = 10
 n_val_episodes_per_epoch = 2
@@ -70,6 +70,7 @@ if __name__ == '__main__':
     print("Model: {}".format(args.model))
     print("Horizon: {}".format(horizon))
     print("Noise Scale: {}".format(noise_scale))
+    print("Loss Rate: {}".format(lr))
     print()
     print("*" *  20)
 

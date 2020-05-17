@@ -17,7 +17,7 @@ models = {'naive', 'td'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_20hzn_2000ep.pth",
+                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_100hzn_10000ep_16-05-2020_15-22-10.pth",
                     help="Where to load saved dict for model")
 args = parser.parse_args()
 

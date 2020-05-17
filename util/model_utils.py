@@ -70,6 +70,14 @@ def train(
     batch_size = model.sequence_length if model.requires_sequence else 1
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
+    # Print filepath we're saving model to
+    print("\nFile name saved:\n{}_{}_{}hzn_{}ep_{}.pth\n".format(
+                            type(model).__name__,
+                            type(dataset.env).__name__,
+                            dataset.env.horizon,
+                            num_epochs*num_train_episodes_per_epoch,
+                            dt_string))
+
     # Train model over requested number of epochs
     for epoch in range(num_epochs):
         # Notify user
@@ -236,6 +244,9 @@ def rollout(
     # Get action limits
     low, high = env.action_spec
 
+    # Setup printing options for numbers
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+
     # Set model mode to rollout
     model.eval()
     model.rollout = True
@@ -278,7 +289,14 @@ def rollout(
             # Now run forward pass to get estimates
             x0_out, x1_out = model(img, measurement_self)
 
+            x0_pos = x0_out.squeeze().detach().numpy()
+            x0_pos_true = true_self.squeeze().detach().numpy()
             x1_pos = x1_out.squeeze().detach().numpy()[:3]
+            x1_pos_true = true_other.squeeze().detach().numpy()[:3]
+
+            print("SELF: Predicted pos: {}, True pos: {}".format(x0_pos, x0_pos_true))
+            #print("OTHER: Predicted pos: {}, True pos: {}".format(x1_pos, x1_pos_true))
+
 
             # Set the indicator object to this xyz location to visualize
             env.move_indicator(x1_pos)
