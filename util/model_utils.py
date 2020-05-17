@@ -87,9 +87,10 @@ def train(
     # Train model over requested number of epochs
     for epoch in range(num_epochs):
         # Notify user
-        print("\n" + "-" * 10)
-        print("Epoch {}/{}".format(epoch, num_epochs - 1))
-        print("-" * 10)
+        if logging:
+            print("\n" + "-" * 10)
+            print("Epoch {}/{}".format(epoch, num_epochs - 1))
+            print("-" * 10)
 
         # We will conduct both training and validation phases
         for phase in ['train', 'val']:
@@ -116,7 +117,8 @@ def train(
             x1_out_vec = []
 
             # Now iterate over data
-            print("Running {}...".format(phase))
+            if logging:
+                print("Running {}...".format(phase))
             for img, x0bar, x0, x1 in dataloader:
                 # Pass all inputs to specified device (cpu or gpu)
                 img = img.to(device)
@@ -175,8 +177,9 @@ def train(
                     writer.add_scalar("Err/val", epoch_err, epoch)
 
             # Print out the stats for this epoch
-            print('{} Loss: {:.4f}, Err: {:.4f}. Time elapsed = {:.0f}m {:.0f}s'.format(
-                phase, epoch_loss, epoch_err, time_elapsed // 60, time_elapsed % 60))
+            if logging:
+                print('{} Loss: {:.4f}, Err: {:.4f}. Time elapsed = {:.0f}m {:.0f}s'.format(
+                    phase, epoch_loss, epoch_err, time_elapsed // 60, time_elapsed % 60))
 
             # Update val history if this is a val loop
             if phase == 'val':
@@ -212,12 +215,14 @@ def train(
                         torch.save(model.state_dict(), save_path)
 
     # Notify user we're done!!
-    print('-' * 10)
+    if logging:
+        print('-' * 10)
 
     # Print out resulting stats
-    time_elapsed = time.time() - since
-    print('Training completed in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    print('Best val Err: {:.4f}'.format(best_err))
+    if logging:
+        time_elapsed = time.time() - since
+        print('Training completed in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+        print('Best val Err: {:.4f}'.format(best_err))
 
     # Load and return the model with the best weights
     model.load_state_dict(best_model)
