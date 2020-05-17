@@ -30,12 +30,12 @@ num_resnet_layers = 50
 latent_dim = 256
 pre_hidden_dims = [128, 64]
 post_hidden_dims = [128, 64]
-pre_lstm_h_dim = 50
-post_lstm_h_dim = 50
+pre_lstm_h_dim = 128
+post_lstm_h_dim = 128
 sequence_length = 10
 
 # Training params
-lr = 0.01
+lr = 0.001
 n_epochs = 1000
 n_train_episodes_per_epoch = 10
 n_val_episodes_per_epoch = 2
@@ -64,15 +64,22 @@ criterion = {
 if __name__ == '__main__':
 
     # First print all options
-    print("*" *  20)
+    print("*" * 20)
     print("Running experiment:")
     print()
     print("Model: {}".format(args.model))
     print("Horizon: {}".format(horizon))
     print("Noise Scale: {}".format(noise_scale))
     print("Loss Rate: {}".format(lr))
+    print("Latent Dim: {}".format(latent_dim))
+    if args.model == 'naive':
+        print("Pre Hidden Dims: {}".format(pre_hidden_dims))
+        print("Post Hidden Dims: {}".format(post_hidden_dims))
+    elif args.model == 'td':
+        print("Pre LSTM Hidden Dim: {}".format(pre_lstm_h_dim))
+        print("Post LSTM Hidden Dim: {}".format(post_lstm_h_dim))
     print()
-    print("*" *  20)
+    print("*" * 20)
 
     # Make sure model is valid
     assert args.model in models, "Error: Invalid model specified. Options are: {}".format(models)
