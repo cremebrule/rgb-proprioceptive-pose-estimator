@@ -26,7 +26,8 @@ def train(
         params,
         device,
         save_path='default',
-        logging=True
+        save_model=True,
+        logging=True,
         ):
     """
     Performs training for a given model for a specified number of epochs.
@@ -43,11 +44,12 @@ def train(
         params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
         device (str): Device to send model to for computations. Can be "cpu" or "cuda:X"
         save_path (str): filepath to where best model state dict will be periodically saved
+        save_model (bool): Whether to save model periodically or not
         logging (bool): Whether we are logging our results via Tensorboard SummaryWriter or not
 
     Returns:
         model (nn.Module): Model with best results
-        val_history (list): List of statistics over training run
+        best_err (float): Best val loss from training
     """
     # Get exact date and time to save model
     now = datetime.now()
@@ -184,26 +186,29 @@ def train(
                     best_err = epoch_err
                     best_model = copy.deepcopy(model.state_dict())
 
-                    # Save it to specified path
-                    if save_path == 'default':
-                        fdir = os.path.dirname(os.path.abspath(__file__))
-                        save_path = os.path.join(fdir, '../log/runs/{}_{}_{}hzn_{}ep_{}.pth'.format(
-                            type(model).__name__,
-                            type(dataset.env).__name__,
-                            dataset.env.horizon,
-                            num_epochs*num_train_episodes_per_epoch,
-                            dt_string),
-                                                 )
+                    # Make sure we actually want to save model first
+                    if save_model:
 
-                    # Make sure path exists, if not, create the nested directory to the location
-                    directory = os.path.dirname(save_path)
-                    try:
-                        os.stat(directory)
-                    except:
-                        os.makedirs(directory)
+                        # Save it to specified path
+                        if save_path == 'default':
+                            fdir = os.path.dirname(os.path.abspath(__file__))
+                            save_path = os.path.join(fdir, '../log/runs/{}_{}_{}hzn_{}ep_{}.pth'.format(
+                                type(model).__name__,
+                                type(dataset.env).__name__,
+                                dataset.env.horizon,
+                                num_epochs*num_train_episodes_per_epoch,
+                                dt_string),
+                                                     )
 
-                    # Lastly, save model dict
-                    torch.save(model.state_dict(), save_path)
+                        # Make sure path exists, if not, create the nested directory to the location
+                        directory = os.path.dirname(save_path)
+                        try:
+                            os.stat(directory)
+                        except:
+                            os.makedirs(directory)
+
+                        # Lastly, save model dict
+                        torch.save(model.state_dict(), save_path)
 
     # Notify user we're done!!
     print('-' * 10)
@@ -215,7 +220,7 @@ def train(
 
     # Load and return the model with the best weights
     model.load_state_dict(best_model)
-    return model, val_history
+    return model, best_err
 
 
 def rollout(

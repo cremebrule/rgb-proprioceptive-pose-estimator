@@ -72,6 +72,7 @@ if __name__ == '__main__':
     print("Noise Scale: {}".format(noise_scale))
     print("Loss Rate: {}".format(lr))
     print("Latent Dim: {}".format(latent_dim))
+    print("Sequence Length: {}".format(sequence_length))
     if args.model == 'naive':
         print("Pre Hidden Dims: {}".format(pre_hidden_dims))
         print("Post Hidden Dims: {}".format(post_hidden_dims))
@@ -140,4 +141,5 @@ if __name__ == '__main__':
         num_val_episodes_per_epoch=n_val_episodes_per_epoch,
         params=params,
         device=device,
+        save_model=True,
     )
