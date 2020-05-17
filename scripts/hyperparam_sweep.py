@@ -9,6 +9,7 @@ import robosuite as suite
 
 from models.naive import NaiveEndEffectorStateEstimator
 from models.time_sensitive import TemporallyDependentStateEstimator
+from models.losses import PoseDistanceLoss
 from util.data_utils import MultiEpisodeDataset
 from util.model_utils import train
 
@@ -102,8 +103,8 @@ dataset = MultiEpisodeDataset(env)
 
 # Define loss criterion
 criterion = {
-    "x0_loss": nn.MSELoss(reduction='sum'),
-    "x1_loss": nn.MSELoss(reduction='sum'),
+    "x0_loss": PoseDistanceLoss(),
+    "x1_loss": PoseDistanceLoss(),
 }
 
 # Define params to pass to training

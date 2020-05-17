@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from models.naive import NaiveEndEffectorStateEstimator
 from models.time_sensitive import TemporallyDependentStateEstimator
+from models.losses import PoseDistanceLoss
 from util.data_utils import MultiEpisodeDataset
 from util.model_utils import train
 import argparse
@@ -55,9 +56,13 @@ env = suite.make(
 )
 
 # Define loss criterion
+#criterion = {
+#    "x0_loss": nn.MSELoss(reduction='sum'),
+#    "x1_loss": nn.MSELoss(reduction='sum'),
+#}
 criterion = {
-    "x0_loss": nn.MSELoss(reduction='sum'),
-    "x1_loss": nn.MSELoss(reduction='sum'),
+    "x0_loss": PoseDistanceLoss(),
+    "x1_loss": PoseDistanceLoss(),
 }
 
 

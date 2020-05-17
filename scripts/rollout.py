@@ -17,7 +17,7 @@ models = {'naive', 'td'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_100hzn_10000ep_16-05-2020_15-22-10.pth",
+                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_10hzn_2000ep_16-05-2020_23-47-35.pth",
                     help="Where to load saved dict for model")
 args = parser.parse_args()
 
@@ -33,15 +33,9 @@ num_resnet_layers = 50
 latent_dim = 256
 pre_hidden_dims = [128, 64]
 post_hidden_dims = [128, 64]
-pre_lstm_h_dim = 50
-post_lstm_h_dim = 50
+pre_lstm_h_dim = 128
+post_lstm_h_dim = 128
 sequence_length = 10
-
-# Training params
-lr = 0.001
-n_epochs = 1000
-n_train_episodes_per_epoch = 10
-n_val_episodes_per_epoch = 2
 
 
 # Define robosuite model
