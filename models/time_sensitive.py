@@ -18,6 +18,7 @@ class TemporallyDependentStateEstimator(nn.Module):
             latent_dim=50,
             sequence_length=10,
             dropout_prob=0.10,
+            feature_extract=True,
     ):
         """
         Args:
@@ -35,12 +36,14 @@ class TemporallyDependentStateEstimator(nn.Module):
             sequence_length (int): Size of sequences to be input into LSTM
 
             dropout_prob (float): Dropout probability for LSTM layers (TODO: Currently does nothing)
+
+            feature_extract (bool): Whether we're feature extracting from ResNet or finetuning
         """
         # Always run super init first
         super(TemporallyDependentStateEstimator, self).__init__()
 
         # Import ResNet as feature model
-        self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim)
+        self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim, feature_extract)
 
         # Define LSTM nets
         self.pre_measurement_rnn = nn.LSTM(input_size=latent_dim, hidden_size=hidden_dim_pre_measurement)

@@ -17,7 +17,7 @@ models = {'naive', 'td'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_10hzn_2000ep_16-05-2020_23-47-35.pth",
+                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_100hzn_10000ep_17-05-2020_00-02-34.pth",
                     help="Where to load saved dict for model")
 args = parser.parse_args()
 
@@ -26,6 +26,7 @@ args = parser.parse_args()
 # robosuite env params
 camera_name = "frontview"
 horizon = 100
+initialization_noise = {"magnitude": 0.5, "type": "uniform"}
 
 # Model params
 noise_scale = 0.01
@@ -51,6 +52,7 @@ env = suite.make(
     camera_names=camera_name,
     controller_configs=controller_config,
     use_indicator_object=True,
+    initialization_noise=initialization_noise,
 )
 
 

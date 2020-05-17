@@ -16,7 +16,8 @@ class NaiveEndEffectorStateEstimator(nn.Module):
             hidden_dims_pre_measurement,
             hidden_dims_post_measurement,
             num_resnet_layers=50,
-            latent_dim=50
+            latent_dim=50,
+            feature_extract=True,
     ):
         """
         Args:
@@ -30,12 +31,14 @@ class NaiveEndEffectorStateEstimator(nn.Module):
                 Options are 18, 34, 50, 101, 152
 
             latent_dim (int): Latent space dimension size; this is the output of the ResNet network
+
+            feature_extract (bool): Whether we're feature extracting from ResNet or finetuning
         """
         # Always run super init first
         super(NaiveEndEffectorStateEstimator, self).__init__()
 
         # Import ResNet as feature model
-        self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim)
+        self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim, feature_extract)
 
         # TODO: Need to initialize weights for FC layers!
 

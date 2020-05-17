@@ -57,8 +57,8 @@ class PoseDistanceLoss(nn.Module):
             ori_dist_squared = 0
 
         # Return summed dist
-        print(summed_pos_sq)
-        print(pos_dist)
+        #print(summed_pos_sq)
+        #print(pos_dist)
         #print(inner_product)
         #print(ori_dist_squared)
         return pos_dist + ori_dist_squared

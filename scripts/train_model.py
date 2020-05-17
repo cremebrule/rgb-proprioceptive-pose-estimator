@@ -24,10 +24,12 @@ args = parser.parse_args()
 # robosuite env params
 camera_name = "frontview"
 horizon = 100
+initialization_noise = {"magnitude": 0.5, "type": "uniform"}
 
 # Model params
 noise_scale = 0.01
 num_resnet_layers = 50
+feature_extract = False
 latent_dim = 256
 pre_hidden_dims = [128, 64]
 post_hidden_dims = [128, 64]
@@ -52,7 +54,8 @@ env = suite.make(
     use_camera_obs=True,
     horizon=horizon,
     camera_names=camera_name,
-    controller_configs=controller_config
+    controller_configs=controller_config,
+    initialization_noise=initialization_noise
 )
 
 # Define loss criterion
@@ -74,8 +77,10 @@ if __name__ == '__main__':
     print()
     print("Model: {}".format(args.model))
     print("Horizon: {}".format(horizon))
+    print("Initialization Noise: {}".format(initialization_noise))
     print("Noise Scale: {}".format(noise_scale))
     print("Loss Rate: {}".format(lr))
+    print("Feature Extraction: {} ".format(feature_extract))
     print("Latent Dim: {}".format(latent_dim))
     print("Sequence Length: {}".format(sequence_length))
     if args.model == 'naive':
@@ -98,7 +103,8 @@ if __name__ == '__main__':
             hidden_dims_pre_measurement=pre_hidden_dims,
             hidden_dims_post_measurement=post_hidden_dims,
             num_resnet_layers=num_resnet_layers,
-            latent_dim=latent_dim
+            latent_dim=latent_dim,
+            feature_extract=False,
         )
     elif args.model == 'td':
         model = TemporallyDependentStateEstimator(
@@ -107,6 +113,7 @@ if __name__ == '__main__':
             num_resnet_layers=num_resnet_layers,
             latent_dim=latent_dim,
             sequence_length=sequence_length,
+            feature_extract=False
         )
     else:
         pass
