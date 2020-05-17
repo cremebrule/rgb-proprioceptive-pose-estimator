@@ -76,12 +76,13 @@ def train(
     model.to(device)
 
     # Print filepath we're saving model to
-    print("\nFile name saved:\n{}_{}_{}hzn_{}ep_{}.pth\n".format(
-                            type(model).__name__,
-                            type(dataset.env).__name__,
-                            dataset.env.horizon,
-                            num_epochs*num_train_episodes_per_epoch,
-                            dt_string))
+    if save_model:
+        print("\nFile name saved:\n{}_{}_{}hzn_{}ep_{}.pth\n".format(
+                                type(model).__name__,
+                                type(dataset.env).__name__,
+                                dataset.env.horizon,
+                                num_epochs*num_train_episodes_per_epoch,
+                                dt_string))
 
     # Train model over requested number of epochs
     for epoch in range(num_epochs):

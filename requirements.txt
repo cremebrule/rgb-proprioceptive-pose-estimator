@@ -2,4 +2,5 @@ robosuite
 torch
 torchvision
 tensorboard
+optuna
 mujoco-py==2.0.2.9

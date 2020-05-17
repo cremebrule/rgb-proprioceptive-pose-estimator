@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     # Now train!
     print("Training...")
-    best_model, val_history = train(
+    best_model, best_val_err = train(
         model=model,
         dataset=dataset,
         criterion=criterion,
