@@ -9,6 +9,7 @@ import torchvision
 from torchvision import datasets, models, transforms
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from datetime import datetime
 import time
 import os
@@ -317,6 +318,62 @@ def rollout(
 
             # Lastly, render
             env.render()
+
+
+def visualize_layer(model, layer, img):
+    """
+    Visualizes the output from a specific layer from a given model
+
+    Args:
+        model (nn.Module): NN Module to pass input through
+        layer (int): Layer to visualize (from resnet)
+            0 results in conv1 layer
+            9 results in bn1 layer
+        img (torch.Tensor): Image to process through nn.Module. Should be of form (C, H, W)
+    """
+    # Define local var to hold layer output
+    layer_out = None
+
+    # Define hook to run
+
+    def forward_hook(module, input_, output):
+        nonlocal layer_out
+        layer_out = output.squeeze(dim=0).detach().numpy()
+
+    # Process layer
+    if layer == 0:
+        layer_name = "conv1"
+    elif layer == 9:
+        layer_name = "bn1"
+    else:
+        layer_name = "layer{}".format(layer)
+
+    # Register hook
+    getattr(model.feature_net, layer_name).register_forward_hook(forward_hook)
+
+    # Run forward pass
+    model.eval()
+    img = img.unsqueeze(dim=0)
+    model.feature_net(img)
+
+    # Get channel dims
+    C, H, W = layer_out.shape
+
+    # Visualize results
+    print(layer_out.shape)
+    n = int(np.ceil(np.sqrt(C)))
+
+    # Create subplot
+    plt.figure()
+
+    # Fill in subplot
+    for i in range(C):
+        plt.subplot(n, n, i+1)
+        plt.imshow(layer_out[i, :, :].squeeze())
+        plt.gca().invert_yaxis()
+
+    plt.setp(plt.gcf().get_axes(), xticks=[], yticks=[])
+    plt.show()
 
 
 def set_parameter_requires_grad(model, feature_extracting):

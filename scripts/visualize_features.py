@@ -1,12 +1,13 @@
 import robosuite as suite
 import torch
 import torch.nn as nn
+from torchvision import datasets, models, transforms
 from models.naive import NaiveEndEffectorStateEstimator
 from models.time_sensitive import TemporallyDependentStateEstimator
-from models.losses import PoseDistanceLoss
 from util.data_utils import MultiEpisodeDataset
-from util.model_utils import train
+from util.model_utils import visualize_layer
 import argparse
+import numpy as np
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -17,6 +18,9 @@ models = {'naive', 'td'}
 # Arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
+parser.add_argument("--model_path", type=str,
+                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_100hzn_10000ep_17-05-2020_00-02-34.pth",
+                    help="Where to load saved dict for model")
 args = parser.parse_args()
 
 # Params to define
@@ -29,19 +33,12 @@ initialization_noise = {"magnitude": 0.5, "type": "uniform"}
 # Model params
 noise_scale = 0.01
 num_resnet_layers = 50
-feature_extract = False
-latent_dim = 1024
-pre_hidden_dims = [512, 128]
-post_hidden_dims = [512, 128]
-pre_lstm_h_dim = 512
-post_lstm_h_dim = 512
+latent_dim = 256
+pre_hidden_dims = [128, 64]
+post_hidden_dims = [128, 64]
+pre_lstm_h_dim = 128
+post_lstm_h_dim = 128
 sequence_length = 10
-
-# Training params
-lr = 0.001
-n_epochs = 1000
-n_train_episodes_per_epoch = 10
-n_val_episodes_per_epoch = 2
 
 
 # Define robosuite model
@@ -53,42 +50,23 @@ env = suite.make(
     has_offscreen_renderer=True,
     use_camera_obs=True,
     horizon=horizon,
+    render_camera=camera_name,
     camera_names=camera_name,
     controller_configs=controller_config,
-    initialization_noise=initialization_noise
+    use_indicator_object=True,
+    initialization_noise=initialization_noise,
 )
-
-# Define loss criterion
-#criterion = {
-#    "x0_loss": nn.MSELoss(reduction='sum'),
-#    "x1_loss": nn.MSELoss(reduction='sum'),
-#}
-criterion = {
-    "x0_loss": PoseDistanceLoss(),
-    "x1_loss": PoseDistanceLoss(),
-}
 
 
 if __name__ == '__main__':
 
     # First print all options
     print("*" * 20)
-    print("Running experiment:")
+    print("Running rollout:")
     print()
     print("Model: {}".format(args.model))
     print("Horizon: {}".format(horizon))
-    print("Initialization Noise: {}".format(initialization_noise))
     print("Noise Scale: {}".format(noise_scale))
-    print("Loss Rate: {}".format(lr))
-    print("Feature Extraction: {} ".format(feature_extract))
-    print("Latent Dim: {}".format(latent_dim))
-    print("Sequence Length: {}".format(sequence_length))
-    if args.model == 'naive':
-        print("Pre Hidden Dims: {}".format(pre_hidden_dims))
-        print("Post Hidden Dims: {}".format(post_hidden_dims))
-    elif args.model == 'td':
-        print("Pre LSTM Hidden Dim: {}".format(pre_lstm_h_dim))
-        print("Post LSTM Hidden Dim: {}".format(post_lstm_h_dim))
     print()
     print("*" * 20)
 
@@ -103,8 +81,7 @@ if __name__ == '__main__':
             hidden_dims_pre_measurement=pre_hidden_dims,
             hidden_dims_post_measurement=post_hidden_dims,
             num_resnet_layers=num_resnet_layers,
-            latent_dim=latent_dim,
-            feature_extract=False,
+            latent_dim=latent_dim
         )
     elif args.model == 'td':
         model = TemporallyDependentStateEstimator(
@@ -113,23 +90,12 @@ if __name__ == '__main__':
             num_resnet_layers=num_resnet_layers,
             latent_dim=latent_dim,
             sequence_length=sequence_length,
-            feature_extract=False
         )
     else:
         pass
 
-    # Define optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    param_list = list(model.parameters())
-
-    # Make sure we're updating the appropriate weights during optimization
-    #for param in param_list:
-    #    if param.requires_grad:
-    #        print(param.shape)
-
-    # Define the dataset
-    print("Loading dataset...")
-    dataset = MultiEpisodeDataset(env)
+    # Load the saved parameters
+    model.load_state_dict(torch.load(args.model_path))
 
     # Define params to pass to training
     params = {
@@ -137,21 +103,41 @@ if __name__ == '__main__':
         "noise_scale": noise_scale
     }
 
-    # Check if CUDA is available
-    use_cuda = torch.cuda.is_available()
-    device = "cuda:0" if use_cuda else "cpu"
+    # Create image pre-processor
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
 
-    # Now train!
-    print("Training...")
-    best_model, best_val_err = train(
-        model=model,
-        dataset=dataset,
-        criterion=criterion,
-        optimizer=optimizer,
-        num_epochs=n_epochs,
-        num_train_episodes_per_epoch=n_train_episodes_per_epoch,
-        num_val_episodes_per_epoch=n_val_episodes_per_epoch,
-        params=params,
-        device=device,
-        save_model=True,
-    )
+    # Get action limits
+    low, high = env.action_spec
+
+    # Setup printing options for numbers
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+
+    # Set model mode to rollout
+    model.eval()
+    model.rollout = True
+
+    # Reset model
+    model.reset_initial_state(1)
+
+
+    while(True):
+        # Take a random step in the environment
+        action = np.random.uniform(low, high)
+        obs, reward, done, _ = env.step(action)
+
+        # Grab an image
+        img = obs[params["camera_name"] + "_image"]
+        img = transform(img).float()
+
+        # Get from user which layer to visualize
+        layer_num = eval(input("ResNet layer number: "))
+
+        # Now visualize results!
+        print("Visualizing Layer {}...".format(layer_num))
+        visualize_layer(model, layer_num, img)
