@@ -314,7 +314,7 @@ def rollout(
 
 
             # Set the indicator object to this xyz location to visualize
-            env.move_indicator(x1_pos)
+            env.move_indicator(x0_pos[:3])
 
             # Lastly, render
             env.render()

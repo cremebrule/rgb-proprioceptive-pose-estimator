@@ -17,7 +17,7 @@ models = {'naive', 'td'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_100hzn_10000ep_17-05-2020_00-02-34.pth",
+                    default="../log/runs/TemporallyDependentStateEstimator_TwoArmLift_100hzn_10000ep_18-05-2020_12-21-39.pth",
                     help="Where to load saved dict for model")
 args = parser.parse_args()
 
@@ -25,17 +25,17 @@ args = parser.parse_args()
 
 # robosuite env params
 camera_name = "frontview"
-horizon = 100
+horizon = 40
 initialization_noise = {"magnitude": 0.5, "type": "uniform"}
 
 # Model params
 noise_scale = 0.01
 num_resnet_layers = 50
-latent_dim = 256
+latent_dim = 1024
 pre_hidden_dims = [128, 64]
 post_hidden_dims = [128, 64]
-pre_lstm_h_dim = 128
-post_lstm_h_dim = 128
+pre_lstm_h_dim = 512
+post_lstm_h_dim = 512
 sequence_length = 10
 
 
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         pass
 
     # Load the saved parameters
-    model.load_state_dict(torch.load(args.model_path))
+    model.load_state_dict(torch.load(args.model_path, map_location=torch.device('cpu')))
 
     # Define params to pass to training
     params = {

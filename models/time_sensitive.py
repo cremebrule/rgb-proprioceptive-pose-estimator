@@ -19,6 +19,7 @@ class TemporallyDependentStateEstimator(nn.Module):
             sequence_length=10,
             dropout_prob=0.10,
             feature_extract=True,
+            feature_layer_nums=(9,)
     ):
         """
         Args:
@@ -38,17 +39,68 @@ class TemporallyDependentStateEstimator(nn.Module):
             dropout_prob (float): Dropout probability for LSTM layers (TODO: Currently does nothing)
 
             feature_extract (bool): Whether we're feature extracting from ResNet or finetuning
+
+            feature_layer_nums (list of int): If not None, determines the additional feature layers to concatenate
+                to the main feature output, where each input is the layer number from resnet:
+                    Layer to visualize (from resnet)
+                        0 results in conv1 layer
+                        9 results in bn1 layer
         """
         # Always run super init first
         super(TemporallyDependentStateEstimator, self).__init__()
 
         # Import ResNet as feature model
+        self.early_features = None
+        self.aux_nets = None
+        self.aux_latent_dim = 0
         self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim, feature_extract)
+        # Add additional feature layer outputs if requested
+        if feature_layer_nums is not None:
+            self.early_features = []
+            self.aux_nets = []
+            # Loop over each layer and add a hook to grab the output from this
+            for layer in feature_layer_nums:
+                # Process layer
+                if layer == 0:
+                    layer_name = "conv1"
+                elif layer == 9:
+                    layer_name = "bn1"
+                else:
+                    layer_name = "layer{}".format(layer)
+
+                # Register hook
+                getattr(self.feature_net, layer_name).register_forward_hook(self.forward_hook)
+
+            # Run a dummy forward pass to get the relevant dimensions from each layer
+            with torch.no_grad():
+                inp = torch.zeros(1, 3, 224, 224)
+                self.feature_net(inp)
+                # Loop over each cached early feature output
+                for feature in self.early_features:
+                    # Get relevant dimensions
+                    _, C, H, W = feature.shape
+                    # Create the auxiliary layer for this layer output
+                    self.aux_nets.append(
+                        torch.nn.Sequential(
+                            torch.nn.Conv2d(in_channels=C, out_channels=1, kernel_size=1),
+                            torch.nn.MaxPool2d(2),
+                            torch.nn.Flatten()
+                        )
+                    )
+                    # Add the (flattened) output dimension to the auxiliary variable
+                    self.aux_latent_dim += H*W // 4
+
+                # Lastly, reset the early features
+                self.early_features = []
+
+        print("Latent Dim + Aux Dim = {}".format(latent_dim + self.aux_latent_dim))
 
         # Define LSTM nets
-        self.pre_measurement_rnn = nn.LSTM(input_size=latent_dim, hidden_size=hidden_dim_pre_measurement)
+        self.pre_measurement_rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim,
+                                           hidden_size=hidden_dim_pre_measurement)
         self.pre_measurement_fc = nn.Linear(hidden_dim_pre_measurement, 7)
-        self.post_measurement_rnn = nn.LSTM(input_size=latent_dim + 7, hidden_size=hidden_dim_post_measurement)
+        self.post_measurement_rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim + 7,
+                                            hidden_size=hidden_dim_post_measurement)
         self.post_measurement_fc = nn.Linear(hidden_dim_post_measurement, 7)
         self.sequence_length = sequence_length
 
@@ -67,6 +119,9 @@ class TemporallyDependentStateEstimator(nn.Module):
         # Set rollout to false by default
         self.rollout = False
 
+    def forward_hook(self, module, input_, output):
+        self.early_features.append(output)
+
     def forward(self, img, self_measurement):
         """
         Forward pass for this model
@@ -82,11 +137,18 @@ class TemporallyDependentStateEstimator(nn.Module):
         """
         # TODO: Check to make sure ResNet is in same eval() or train() mode as top level layers
         # First, reshape imgs before passing through ResNet
-        S, N, H, W, C = img.shape
-        img = img.view(-1, H, W, C)
+        S, N, C, H, W = img.shape
+        img = img.view(-1, C, H, W)
 
         # Pass img through ResNet to extract features
         features = self.feature_net(img)
+
+        # Combine main features with earlier-layer features if requested
+        if self.early_features is not None:
+            # Compute auxiliary features
+            aux_features = [aux_net(layer_features) for aux_net, layer_features in
+                            zip(self.aux_nets, self.early_features)]
+            features = torch.cat((features, *aux_features), dim=-1)
 
         # Reshape features
         features = features.view(S, N, -1)                              # Output shape (S, N, latent_dim)
@@ -132,6 +194,9 @@ class TemporallyDependentStateEstimator(nn.Module):
 
         # Run FC layer
         post_out = self.post_measurement_fc(post_measurement_h)  # Output shape (S, N, 7)
+
+        # Lastly, clear early features variable before returning
+        self.early_features = []
 
         # Return final output
         return pre_out, post_out

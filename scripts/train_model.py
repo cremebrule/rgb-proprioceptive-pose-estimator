@@ -27,7 +27,7 @@ horizon = 100
 initialization_noise = {"magnitude": 0.5, "type": "uniform"}
 
 # Model params
-noise_scale = 0.01
+noise_scale = 0.0001
 num_resnet_layers = 50
 feature_extract = False
 latent_dim = 1024
