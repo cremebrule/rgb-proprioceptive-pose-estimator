@@ -78,14 +78,27 @@ class MultiEpisodeDataset(Dataset):
             measurement_self = []
             true_self = []
             true_other = []
+            sub_traj_steps = 10
+            sub_traj_ct = 0
+            action = np.random.uniform(low, high)
             done = False
 
             print("Running episode {} of {}...".format(i+1, num_episodes))
 
             # Start grabbing data after each step
             while not done:
-                # Grab random action for entire action space
-                action = np.random.uniform(low, high)
+                # Grab random action for entire action space (only once every few substeps!)
+                if sub_traj_ct == sub_traj_steps:
+                    # Re-sample action
+                    action = np.random.uniform(low, high)
+                    # Reset traj counter and re-sample substeps count
+                    sub_traj_ct = 0
+                    sub_traj_steps = np.random.randint(5, 15)
+                else:
+                    # increment counter
+                    sub_traj_ct += 1
+
+                # Execute action
                 obs, reward, done, _ = self.env.step(action)
 
                 # Grab appropriate info as needed

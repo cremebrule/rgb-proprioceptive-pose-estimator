@@ -37,6 +37,7 @@ post_hidden_dims = [128, 64]
 pre_lstm_h_dim = 512
 post_lstm_h_dim = 512
 sequence_length = 10
+feature_layer_nums = None
 
 
 # Define robosuite model
@@ -88,6 +89,7 @@ if __name__ == '__main__':
             num_resnet_layers=num_resnet_layers,
             latent_dim=latent_dim,
             sequence_length=sequence_length,
+            feature_layer_nums=feature_layer_nums,
         )
     else:
         pass

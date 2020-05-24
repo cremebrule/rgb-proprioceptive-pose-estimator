@@ -40,8 +40,8 @@ class TemporallyDependentStateEstimator(nn.Module):
 
             feature_extract (bool): Whether we're feature extracting from ResNet or finetuning
 
-            feature_layer_nums (list of int): If not None, determines the additional feature layers to concatenate
-                to the main feature output, where each input is the layer number from resnet:
+            feature_layer_nums (None or list of int): If not None, determines the additional feature layers to
+                concatenate to the main feature output, where each input is the layer number from resnet:
                     Layer to visualize (from resnet)
                         0 results in conv1 layer
                         9 results in bn1 layer
@@ -70,6 +70,7 @@ class TemporallyDependentStateEstimator(nn.Module):
 
                 # Register hook
                 getattr(self.feature_net, layer_name).register_forward_hook(self.forward_hook)
+                #getattr(self.feature_net, layer_name).register_backward_hook(self.backward_hook)
 
             # Run a dummy forward pass to get the relevant dimensions from each layer
             with torch.no_grad():
@@ -121,6 +122,19 @@ class TemporallyDependentStateEstimator(nn.Module):
 
     def forward_hook(self, module, input_, output):
         self.early_features.append(output)
+
+    def backward_hook(self, module, grad_input, grad_output):
+        print('Inside ' + self.__class__.__name__ + ' backward')
+        print('Inside class:' + self.__class__.__name__)
+        print('')
+        print('grad_input: ', type(grad_input))
+        print('grad_input[0]: ', type(grad_input[0]))
+        print('grad_output: ', type(grad_output))
+        print('grad_output[0]: ', type(grad_output[0]))
+        print('')
+        print('grad_input size:', grad_input[0].size())
+        print('grad_output size:', grad_output[0].size())
+        print('grad_input norm:', grad_input[0].norm())
 
     def forward(self, img, self_measurement):
         """
@@ -196,7 +210,8 @@ class TemporallyDependentStateEstimator(nn.Module):
         post_out = self.post_measurement_fc(post_measurement_h)  # Output shape (S, N, 7)
 
         # Lastly, clear early features variable before returning
-        self.early_features = []
+        if self.early_features is not None:
+            self.early_features = []
 
         # Return final output
         return pre_out, post_out

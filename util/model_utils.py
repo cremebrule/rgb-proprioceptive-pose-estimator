@@ -274,12 +274,27 @@ def rollout(
         # Reset model internals
         model.reset_initial_state(batch_size=1)
 
+        # Auto-variables to reset per episode
+        sub_traj_steps = 10
+        sub_traj_ct = 0
+        action = np.random.uniform(low, high)
+
         # Variable to know when episode is done
         done = False
 
         while not done:
-            # Take a random step in the environment
-            action = np.random.uniform(low, high)
+            # Grab random action for entire action space (only once every few substeps!)
+            if sub_traj_ct == sub_traj_steps:
+                # Re-sample action
+                action = np.random.uniform(low, high)
+                # Reset traj counter and re-sample substeps count
+                sub_traj_ct = 0
+                sub_traj_steps = np.random.randint(5, 15)
+            else:
+                # increment counter
+                sub_traj_ct += 1
+
+            # Execute action
             obs, reward, done, _ = env.step(action)
 
             # Get relevant observations
@@ -309,12 +324,13 @@ def rollout(
             x1_pos = x1_out.squeeze().detach().numpy()[:3]
             x1_pos_true = true_other.squeeze().detach().numpy()[:3]
 
-            print("SELF: Predicted pos: {}, True pos: {}".format(x0_pos, x0_pos_true))
-            #print("OTHER: Predicted pos: {}, True pos: {}".format(x1_pos, x1_pos_true))
+            #print("SELF: Predicted pos: {}, True pos: {}".format(x0_pos, x0_pos_true))
+            print("OTHER: Predicted pos: {}, True pos: {}".format(x1_pos, x1_pos_true))
 
 
             # Set the indicator object to this xyz location to visualize
-            env.move_indicator(x0_pos[:3])
+            #env.move_indicator(x0_pos[:3])
+            env.move_indicator(x1_pos)
 
             # Lastly, render
             env.render()
@@ -366,11 +382,14 @@ def visualize_layer(model, layer, img):
     # Create subplot
     plt.figure()
 
+    plt.imshow(layer_out[92, :, :].squeeze())
+    plt.gca().invert_yaxis()
+
     # Fill in subplot
-    for i in range(C):
-        plt.subplot(n, n, i+1)
-        plt.imshow(layer_out[i, :, :].squeeze())
-        plt.gca().invert_yaxis()
+    #for i in range(C):
+    #    plt.subplot(n, n, i+1)
+    #    plt.imshow(layer_out[i, :, :].squeeze())
+    #    plt.gca().invert_yaxis()
 
     plt.setp(plt.gcf().get_axes(), xticks=[], yticks=[])
     plt.show()

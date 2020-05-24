@@ -27,7 +27,7 @@ horizon = 100
 initialization_noise = {"magnitude": 0.5, "type": "uniform"}
 
 # Model params
-noise_scale = 0.0001
+noise_scale = 0.001
 num_resnet_layers = 50
 feature_extract = False
 latent_dim = 1024
@@ -36,6 +36,7 @@ post_hidden_dims = [512, 128]
 pre_lstm_h_dim = 512
 post_lstm_h_dim = 512
 sequence_length = 10
+feature_layer_nums = (9,)
 
 # Training params
 lr = 0.001
@@ -83,6 +84,7 @@ if __name__ == '__main__':
     print("Feature Extraction: {} ".format(feature_extract))
     print("Latent Dim: {}".format(latent_dim))
     print("Sequence Length: {}".format(sequence_length))
+    print("Feature Layer Nums: {}".format(feature_layer_nums))
     if args.model == 'naive':
         print("Pre Hidden Dims: {}".format(pre_hidden_dims))
         print("Post Hidden Dims: {}".format(post_hidden_dims))
@@ -113,7 +115,8 @@ if __name__ == '__main__':
             num_resnet_layers=num_resnet_layers,
             latent_dim=latent_dim,
             sequence_length=sequence_length,
-            feature_extract=False
+            feature_extract=False,
+            feature_layer_nums=feature_layer_nums
         )
     else:
         pass
