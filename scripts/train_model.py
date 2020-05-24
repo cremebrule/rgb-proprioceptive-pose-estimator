@@ -97,6 +97,11 @@ if __name__ == '__main__':
     # Make sure model is valid
     assert args.model in models, "Error: Invalid model specified. Options are: {}".format(models)
 
+    # Check if CUDA is available
+    use_cuda = torch.cuda.is_available()
+    device = "cuda:0" if use_cuda else "cpu"
+    print("Using device: {}".format(device))
+
     # Create model
     print("Loading model...")
     model = None
@@ -116,7 +121,8 @@ if __name__ == '__main__':
             latent_dim=latent_dim,
             sequence_length=sequence_length,
             feature_extract=False,
-            feature_layer_nums=feature_layer_nums
+            feature_layer_nums=feature_layer_nums,
+            device=device
         )
     else:
         pass
@@ -139,10 +145,6 @@ if __name__ == '__main__':
         "camera_name": camera_name,
         "noise_scale": noise_scale
     }
-
-    # Check if CUDA is available
-    use_cuda = torch.cuda.is_available()
-    device = "cuda:0" if use_cuda else "cpu"
 
     # Now train!
     print("Training...")

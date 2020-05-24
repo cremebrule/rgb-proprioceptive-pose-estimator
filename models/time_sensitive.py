@@ -19,7 +19,8 @@ class TemporallyDependentStateEstimator(nn.Module):
             sequence_length=10,
             dropout_prob=0.10,
             feature_extract=True,
-            feature_layer_nums=(9,)
+            feature_layer_nums=(9,),
+            device='cpu'
     ):
         """
         Args:
@@ -40,11 +41,13 @@ class TemporallyDependentStateEstimator(nn.Module):
 
             feature_extract (bool): Whether we're feature extracting from ResNet or finetuning
 
-            feature_layer_nums (None or list of int): If not None, determines the additional feature layers to
+            feature_layer_nums (None or Tuple of int): If not None, determines the additional feature layers to
                 concatenate to the main feature output, where each input is the layer number from resnet:
                     Layer to visualize (from resnet)
                         0 results in conv1 layer
                         9 results in bn1 layer
+
+            device (str): Device to send all sub modules to
         """
         # Always run super init first
         super(TemporallyDependentStateEstimator, self).__init__()
@@ -86,7 +89,7 @@ class TemporallyDependentStateEstimator(nn.Module):
                             torch.nn.Conv2d(in_channels=C, out_channels=1, kernel_size=1),
                             torch.nn.MaxPool2d(2),
                             torch.nn.Flatten()
-                        )
+                        ).to(device)
                     )
                     # Add the (flattened) output dimension to the auxiliary variable
                     self.aux_latent_dim += H*W // 4
@@ -98,11 +101,11 @@ class TemporallyDependentStateEstimator(nn.Module):
 
         # Define LSTM nets
         self.pre_measurement_rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim,
-                                           hidden_size=hidden_dim_pre_measurement)
-        self.pre_measurement_fc = nn.Linear(hidden_dim_pre_measurement, 7)
+                                           hidden_size=hidden_dim_pre_measurement).to(device)
+        self.pre_measurement_fc = nn.Linear(hidden_dim_pre_measurement, 7).to(device)
         self.post_measurement_rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim + 7,
-                                            hidden_size=hidden_dim_post_measurement)
-        self.post_measurement_fc = nn.Linear(hidden_dim_post_measurement, 7)
+                                            hidden_size=hidden_dim_post_measurement).to(device)
+        self.post_measurement_fc = nn.Linear(hidden_dim_post_measurement, 7).to(device)
         self.sequence_length = sequence_length
 
         # Define hidden and cell states
