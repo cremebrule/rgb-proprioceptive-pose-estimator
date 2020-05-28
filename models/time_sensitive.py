@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from util.model_utils import import_resnet
+import math
 
 
 class TemporallyDependentStateEstimator(nn.Module):
@@ -55,12 +56,14 @@ class TemporallyDependentStateEstimator(nn.Module):
         # Import ResNet as feature model
         self.early_features = None
         self.aux_nets = None
+        self.depth_nets = None
         self.aux_latent_dim = 0
         self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim, feature_extract)
         # Add additional feature layer outputs if requested
         if feature_layer_nums is not None:
             self.early_features = []
             self.aux_nets = []
+            self.depth_nets = []
             # Loop over each layer and add a hook to grab the output from this
             for layer in feature_layer_nums:
                 # Process layer
@@ -91,6 +94,14 @@ class TemporallyDependentStateEstimator(nn.Module):
                             torch.nn.Flatten()
                         ).to(device)
                     )
+                    # Define depth net for this layer
+                    self.depth_nets.append(
+                        torch.nn.Sequential(
+                            *([torch.nn.AvgPool2d(2) for i in range(int(math.log(224**2 / (H*W // 4), 4)))] +
+                            [torch.nn.Flatten()])
+                        ).to(device)
+                    )
+
                     # Add the (flattened) output dimension to the auxiliary variable
                     self.aux_latent_dim += H*W // 4
 
@@ -139,12 +150,13 @@ class TemporallyDependentStateEstimator(nn.Module):
         print('grad_output size:', grad_output[0].size())
         print('grad_input norm:', grad_input[0].norm())
 
-    def forward(self, img, self_measurement):
+    def forward(self, img, depth, self_measurement):
         """
         Forward pass for this model
 
         Args:
-            img (torch.Tensor): tensor representing batch of sequences of images of shape (S, N, H, W, C)
+            img (torch.Tensor): tensor representing batch of sequences of images of shape (S, N, C, H, W)
+            depth (torch.Tensor): tensor representing batch of depth images of shape (S, N, 1, H, W)
             self_measurement (torch.Tensor): tensor representing batch of sequence of measurements of active robot's eef state
                 of shape (S, N, 7)
 
@@ -157,6 +169,9 @@ class TemporallyDependentStateEstimator(nn.Module):
         S, N, C, H, W = img.shape
         img = img.view(-1, C, H, W)
 
+        # Reshape depth
+        depth = depth.view(-1, 1, H, W)
+
         # Pass img through ResNet to extract features
         features = self.feature_net(img)
 
@@ -165,7 +180,14 @@ class TemporallyDependentStateEstimator(nn.Module):
             # Compute auxiliary features
             aux_features = [aux_net(layer_features) for aux_net, layer_features in
                             zip(self.aux_nets, self.early_features)]
-            features = torch.cat((features, *aux_features), dim=-1)
+            # Compute depth features
+            depth_features = [depth_net(depth) for depth_net in
+                              self.depth_nets]
+            # Combine these features
+            synth_features = [aux_feature * depth_feature for aux_feature, depth_feature in
+                              zip(aux_features, depth_features)]
+            # Concat these synthesized features into main feature array
+            features = torch.cat((features, *synth_features), dim=-1)
 
         # Reshape features
         features = features.view(S, N, -1)                              # Output shape (S, N, latent_dim)

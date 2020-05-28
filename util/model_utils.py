@@ -120,9 +120,10 @@ def train(
             # Now iterate over data
             if logging:
                 print("Running {}...".format(phase))
-            for img, x0bar, x0, x1 in dataloader:
+            for img, depth, x0bar, x0, x1 in dataloader:
                 # Pass all inputs to specified device (cpu or gpu)
                 img = img.to(device)
+                depth = depth.to(device)
                 x0bar = x0bar.to(device)
                 x0 = x0.to(device)
                 x1 = x1.to(device)
@@ -130,6 +131,7 @@ def train(
                 # squeeze 1st dim (only if we're not using sequences)
                 if not model.requires_sequence:
                     img = torch.squeeze(img, dim=0)
+                    depth = torch.squeeze(depth, dim=0)
                     x0bar = torch.squeeze(x0bar, dim=0)
                     x0 = torch.squeeze(x0, dim=0)
                     x1 = torch.squeeze(x1, dim=0)
@@ -142,7 +144,7 @@ def train(
                 # Run the forward pass, and only track gradients if we're in the training mode
                 with torch.set_grad_enabled(phase == 'train'):
                     # Calculate outputs
-                    x0_out, x1_out = model(img, x0bar)      # Each output is shape (S, N, 7)
+                    x0_out, x1_out = model(img, depth, x0bar)      # Each output is shape (S, N, 7)
 
                     # Calculate losses
                     loss_x0 = criterion["x0_loss"](x0_out, x0)

@@ -64,12 +64,13 @@ class NaiveEndEffectorStateEstimator(nn.Module):
         # Set rollout to false by default
         self.rollout = False
 
-    def forward(self, img, self_measurement):
+    def forward(self, img, depth, self_measurement):
         """
         Forward pass for this model
 
         Args:
-            img (torch.Tensor): tensor representing batch of images of shape (N, H, W, C)
+            img (torch.Tensor): tensor representing batch of images of shape (N, C, H, W)
+            depth (torch.Tensor): tensor representing batch of depth images of shape (N, 1, H, W)
             self_measurement (torch.Tensor): tensor representing batch of measurements of active robot's eef state
                 of shape (N, 7)
 

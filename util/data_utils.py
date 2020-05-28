@@ -37,17 +37,24 @@ class MultiEpisodeDataset(Dataset):
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
+        self.depth_transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor()
+        ])
 
     def __len__(self):
         return self.data["measurement_self"].size(1)
 
     def __getitem__(self, index):
         img = self.data['imgs'][:, index, :, :, :]      # imgs shape (n_ep, ep_length, C, H, W)
+        depth = self.data['depths'][:, index, :, :, :]  # depths shape (n_ep, ep_length, 1, H, W)
         x0bar = self.data['measurement_self'][:, index, :]  # measurement_self shape (n_ep, ep_length, x_dim)
         x0 = self.data['true_self'][:, index, :]    # true_self shape (n_ep, ep_length, x_dim)
         x1 = self.data['true_other'][:, index, :]   # true_other shape (n_ep, ep_length, x_dim)
 
-        return img, x0bar, x0, x1
+        return img, depth, x0bar, x0, x1
 
     def refresh_data(self, num_episodes, camera_name, noise_scale):
         """
@@ -61,6 +68,7 @@ class MultiEpisodeDataset(Dataset):
         # Create variable to hold new data
         new_data = {
             'imgs': [],
+            'depths': [],
             'measurement_self': [],
             'true_self': [],
             'true_other': []
@@ -75,6 +83,7 @@ class MultiEpisodeDataset(Dataset):
 
             # Reset auto variables
             imgs = []
+            depths = []
             measurement_self = []
             true_self = []
             true_other = []
@@ -105,10 +114,12 @@ class MultiEpisodeDataset(Dataset):
 
                 # Need to preprocess image first before appending
                 img = obs[camera_name + "_image"]
+                depth = obs[camera_name + "_depth"]
                 #print(obs[camera_name + "_image"].shape)
                 #img = Image.fromarray(np.uint8(np.transpose(obs[camera_name + "_image"], (2,0,1))))       # new shape should be (C, H, W)
                 #print(img.shape)
                 imgs.append(self.transform(img).float())
+                depths.append(self.depth_transform(depth).float())
                 x0 = np.concatenate([obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
                 x0bar = x0 + np.random.multivariate_normal(mean=np.zeros(7), cov=np.eye(7) * noise_scale)
                 # Renormalize the orientation part
@@ -120,12 +131,14 @@ class MultiEpisodeDataset(Dataset):
 
             # After episode completes, add to new_data
             new_data["imgs"].append(torch.stack(imgs))
+            new_data["depths"].append(torch.stack(depths))
             new_data["measurement_self"].append(measurement_self)
             new_data["true_self"].append(true_self)
             new_data["true_other"].append(true_other)
 
         # Finally convert new data to Tensors
         new_data["imgs"] = torch.stack(new_data["imgs"])
+        new_data["depths"] = torch.stack(new_data["depths"])
         new_data["measurement_self"] = torch.tensor(new_data["measurement_self"], dtype=torch.float, requires_grad=False)
         new_data["true_self"] = torch.tensor(new_data["true_self"], dtype=torch.float, requires_grad=False)
         new_data["true_other"] = torch.tensor(new_data["true_other"], dtype=torch.float, requires_grad=False)

@@ -52,6 +52,7 @@ env = suite.make(
     robots=["Panda", "Sawyer"],
     has_renderer=False,
     has_offscreen_renderer=True,
+    camera_depths=True,
     use_camera_obs=True,
     horizon=horizon,
     camera_names=camera_name,
