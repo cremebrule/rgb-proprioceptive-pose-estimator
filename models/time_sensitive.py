@@ -98,7 +98,7 @@ class TemporallyDependentStateEstimator(nn.Module):
                     self.depth_nets.append(
                         torch.nn.Sequential(
                             *([torch.nn.AvgPool2d(2) for i in range(int(math.log(224**2 / (H*W // 4), 4)))] +
-                            [torch.nn.Flatten()])
+                            [torch.nn.InstanceNorm2d(1, affine=True), torch.nn.Flatten()])
                         ).to(device)
                     )
 

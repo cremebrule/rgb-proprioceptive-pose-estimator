@@ -41,7 +41,7 @@ class MultiEpisodeDataset(Dataset):
             transforms.ToPILImage(),
             transforms.Resize(256),
             transforms.CenterCrop(224),
-            transforms.ToTensor()
+            transforms.ToTensor(),
         ])
 
     def __len__(self):
