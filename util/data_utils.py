@@ -9,7 +9,7 @@ class MultiEpisodeDataset(Dataset):
     Class for processing multiple episodes as a dataset
     """
 
-    def __init__(self, env, custom_transform=None):
+    def __init__(self, env, use_depth=False, obj_name=None, custom_transform=None):
         """
         Initializes custom dataset class
 
@@ -21,11 +21,16 @@ class MultiEpisodeDataset(Dataset):
 
         Args:
             env (MujocoEnv): Env to grab online sim data from
+            use_depth (bool): Whether to use depth observations or not
+            obj_name (str): Name of object to grab pose values from environment
             custom_transform (Transform): (Optional) Custom transform to be applied to image observations. Default is
                 None, which results in default transform being applied (Normalization + Scaling)
         """
         self.data = None
         self.env = env
+        self.obj_name = obj_name
+        self.use_depth = use_depth
+        self.is_two_arm = "TwoArm" in str(type(self.env))
 
         if custom_transform:
             self.transform = custom_transform
@@ -48,13 +53,14 @@ class MultiEpisodeDataset(Dataset):
         return self.data["measurement_self"].size(1)
 
     def __getitem__(self, index):
-        img = self.data['imgs'][:, index, :, :, :]      # imgs shape (n_ep, ep_length, C, H, W)
-        depth = self.data['depths'][:, index, :, :, :]  # depths shape (n_ep, ep_length, 1, H, W)
-        x0bar = self.data['measurement_self'][:, index, :]  # measurement_self shape (n_ep, ep_length, x_dim)
-        x0 = self.data['true_self'][:, index, :]    # true_self shape (n_ep, ep_length, x_dim)
-        x1 = self.data['true_other'][:, index, :]   # true_other shape (n_ep, ep_length, x_dim)
+        img = self.data['imgs'][:, index, :, :, :]                              # imgs shape (n_ep, ep_length, C, H, W)
+        depth = self.data['depths'][:, index, :, :, :] if self.use_depth else torch.empty(*img.shape)  # depths shape (n_ep, ep_length, 1, H, W)
+        x0bar = self.data['measurement_self'][:, index, :]                      # measurement_self shape (n_ep, ep_length, x_dim)
+        x0 = self.data['true_self'][:, index, :]                                # true_self shape (n_ep, ep_length, x_dim)
+        x1 = self.data['true_other'][:, index, :] if self.is_two_arm else torch.empty(*x0.shape)  # true_other shape (n_ep, ep_length, x_dim)
+        obj = self.data['true_obj'][:, index, :] if self.obj_name is not None else torch.empty(*x0.shape)
 
-        return img, depth, x0bar, x0, x1
+        return img, depth, x0bar, x0, x1, obj
 
     def refresh_data(self, num_episodes, camera_name, noise_scale):
         """
@@ -71,7 +77,8 @@ class MultiEpisodeDataset(Dataset):
             'depths': [],
             'measurement_self': [],
             'true_self': [],
-            'true_other': []
+            'true_other': [],
+            'true_obj': []
         }
 
         # Get action limits
@@ -87,6 +94,7 @@ class MultiEpisodeDataset(Dataset):
             measurement_self = []
             true_self = []
             true_other = []
+            true_obj = []
             sub_traj_steps = 10
             sub_traj_ct = 0
             action = np.random.uniform(low, high)
@@ -114,12 +122,13 @@ class MultiEpisodeDataset(Dataset):
 
                 # Need to preprocess image first before appending
                 img = obs[camera_name + "_image"]
-                depth = obs[camera_name + "_depth"]
+                if self.use_depth:
+                    depth = obs[camera_name + "_depth"]
+                    depths.append(self.depth_transform(depth).float())
                 #print(obs[camera_name + "_image"].shape)
                 #img = Image.fromarray(np.uint8(np.transpose(obs[camera_name + "_image"], (2,0,1))))       # new shape should be (C, H, W)
                 #print(img.shape)
                 imgs.append(self.transform(img).float())
-                depths.append(self.depth_transform(depth).float())
                 x0 = np.concatenate([obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
                 x0bar = x0 + np.random.multivariate_normal(mean=np.zeros(7), cov=np.eye(7) * noise_scale)
                 # Renormalize the orientation part
@@ -127,21 +136,34 @@ class MultiEpisodeDataset(Dataset):
                 x0bar[3:] /= mag
                 measurement_self.append(x0bar)
                 true_self.append(x0)
-                true_other.append(np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]]))
+                # Get second arm pose if environment has multiple arms
+                if self.is_two_arm:
+                    true_other.append(np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]]))
+                if self.obj_name is not None:
+                    # Get object observations if requested
+                    true_obj.append(np.concatenate([obs[self.obj_name + "_pos"], obs[self.obj_name + "_quat"]]))
 
             # After episode completes, add to new_data
             new_data["imgs"].append(torch.stack(imgs))
-            new_data["depths"].append(torch.stack(depths))
+            if self.use_depth:
+                new_data["depths"].append(torch.stack(depths))
             new_data["measurement_self"].append(measurement_self)
             new_data["true_self"].append(true_self)
-            new_data["true_other"].append(true_other)
+            if self.is_two_arm:
+                new_data["true_other"].append(true_other)
+            if self.obj_name is not None:
+                new_data["true_obj"].append(true_obj)
 
         # Finally convert new data to Tensors
         new_data["imgs"] = torch.stack(new_data["imgs"])
-        new_data["depths"] = torch.stack(new_data["depths"])
+        if self.use_depth:
+            new_data["depths"] = torch.stack(new_data["depths"])
         new_data["measurement_self"] = torch.tensor(new_data["measurement_self"], dtype=torch.float, requires_grad=False)
         new_data["true_self"] = torch.tensor(new_data["true_self"], dtype=torch.float, requires_grad=False)
-        new_data["true_other"] = torch.tensor(new_data["true_other"], dtype=torch.float, requires_grad=False)
+        if self.is_two_arm:
+            new_data["true_other"] = torch.tensor(new_data["true_other"], dtype=torch.float, requires_grad=False)
+        if self.obj_name is not None:
+            new_data["true_obj"] = torch.tensor(new_data["true_obj"], dtype=torch.float, requires_grad=False)
 
         # Now save the new_data as self.data
         self.data = new_data
