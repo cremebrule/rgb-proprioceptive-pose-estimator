@@ -38,7 +38,7 @@ args = parser.parse_args()
 # robosuite env params
 camera_name = args.camera_name
 horizon = args.horizon
-initialization_noise = {"magnitude": 0.5, "type": "uniform"}
+initialization_noise = "default" if args.model == 'tdo' else {"magnitude": 0.5, "type": "uniform"}
 
 # Model params
 noise_scale = args.noise_scale

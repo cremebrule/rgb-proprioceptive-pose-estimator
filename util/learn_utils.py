@@ -388,3 +388,4 @@ def rollout(
 
             # Lastly, render
             env.render()
+            env.render()

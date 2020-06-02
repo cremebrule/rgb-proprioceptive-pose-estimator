@@ -13,7 +13,7 @@
 #################
 #set a job name
 #{{JOB_NAME}}
-#SBATCH --job-name="TDOSE_Lift_Panda"
+#SBATCH --job-name="TDOSE_Lift_Panda_20_SeqLength"
 #################
 #a file for job output, you can check job progress, append the job ID with %j to make it unique
 #SBATCH --output=/cvgl2/u/jdwong/test_output/%j.out
@@ -62,13 +62,13 @@ python train_model.py \
 --model tdo \
 --controller OSC_POSITION \
 --camera_name robot0_eye_in_hand \
---horizon 100 \
---sequence_length 10 \
+--horizon 20 \
+--sequence_length 20 \
 --noise_scale 0.001 \
 --latent_dim 512 \
 --lr 0.001 \
---n_train_episodes_per_epoch 10 \
---n_val_episodes_per_epoch 2 \
+--n_train_episodes_per_epoch 25 \
+--n_val_episodes_per_epoch 5 \
 --env Lift \
 --robots Panda \
 --use_placement_initializer \

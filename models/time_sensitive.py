@@ -173,9 +173,6 @@ class TemporallyDependentStateEstimator(nn.Module):
         S, N, C, H, W = img.shape
         img = img.view(-1, C, H, W)
 
-        # Reshape depth
-        depth = depth.view(-1, 1, H, W)
-
         # Pass img through ResNet to extract features
         features = self.feature_net(img)
 
@@ -185,6 +182,8 @@ class TemporallyDependentStateEstimator(nn.Module):
             aux_features = [aux_net(layer_features) for aux_net, layer_features in
                             zip(self.aux_nets, self.early_features)]
             if self.use_depth:
+                # Reshape depth
+                depth = depth.view(-1, 1, H, W)
                 # Compute depth features
                 depth_features = [depth_net(depth) for depth_net in
                                   self.depth_nets]
@@ -432,9 +431,6 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
         S, N, C, H, W = img.shape
         img = img.view(-1, C, H, W)
 
-        # Reshape depth
-        depth = depth.view(-1, 1, H, W)
-
         # Pass img through ResNet to extract features
         features = self.feature_net(img)
 
@@ -445,6 +441,8 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
                             zip(self.aux_nets, self.early_features)]
             # use depth features if requested
             if self.use_depth:
+                # Reshape depth
+                depth = depth.view(-1, 1, H, W)
                 # Compute depth features
                 depth_features = [depth_net(depth) for depth_net in
                                   self.depth_nets]
