@@ -30,6 +30,7 @@ parser.add_argument("--robots", nargs="+", type=str, default=["Panda", "Sawyer"]
 parser.add_argument("--use_placement_initializer", action="store_true", help="Whether to use custom placement initializer")
 parser.add_argument("--feature_extract", action="store_true", help="Whether ResNet will be set to feature extract mode or not")
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
+parser.add_argument("--use_pretrained", action="store_true", help="Whether to usepretrained ResNet or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
 parser.add_argument("--distance_metric", type=str, default="l2", help="Distance metric to use for loss")
@@ -109,6 +110,7 @@ if __name__ == '__main__':
     print("Running experiment:")
     print()
     print("Model: {}".format(args.model))
+    print("Pretrained ResNet: {}".format(args.use_pretrained))
     print("Env: {}".format(args.env))
     print("Robots: {}".format(args.robots))
     print("Motion: {}".format(args.motion))
@@ -162,6 +164,7 @@ if __name__ == '__main__':
             feature_extract=args.feature_extract,
             feature_layer_nums=feature_layer_nums,
             use_depth=args.use_depth,
+            use_pretrained=args.use_pretrained,
             device=device
         )
     elif args.model == 'tdo':
@@ -174,6 +177,7 @@ if __name__ == '__main__':
             feature_extract=args.feature_extract,
             feature_layer_nums=feature_layer_nums,
             use_depth=args.use_depth,
+            use_pretrained=args.use_pretrained,
             device=device
         )
 

@@ -18,7 +18,7 @@ models = {'naive', 'td', 'tdo'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_5000ep_02-06-2020_11-04-33.pth",
+                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_5000ep_02-06-2020_12-01-18.pth",
                     help="Where to load saved dict for model")
 parser.add_argument("--controller", type=str, default="OSC_POSE", help="Which controller to use in env")
 parser.add_argument("--camera_name", type=str, default="frontview", help="Name of camera to render for observations")
@@ -80,14 +80,14 @@ controller_config = suite.load_controller_config(default_controller=args.control
 env = suite.make(
     args.env,
     robots=args.robots,
-    has_renderer=True,
+    has_renderer=False,
     has_offscreen_renderer=True,
     camera_depths=args.use_depth,
     use_camera_obs=True,
     horizon=horizon,
     camera_names=camera_name,
     controller_configs=controller_config,
-    use_indicator_object=True,
+    #use_indicator_object=True,
     initialization_noise=initialization_noise,
     placement_initializer=placement_initializer
 )

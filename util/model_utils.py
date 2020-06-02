@@ -93,7 +93,7 @@ def import_resnet(num_layers, output_dim, feature_extract=True, use_pretrained=T
 
     # Import the requested model
     model = getattr(models, "resnet" + str(num_layers))(pretrained=use_pretrained)
-    set_parameter_requires_grad(model, feature_extract)
+    set_parameter_requires_grad(model, (feature_extract and use_pretrained))
 
     # Modify final fc layer of resnet
     fc_input_dim = model.fc.in_features

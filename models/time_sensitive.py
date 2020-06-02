@@ -22,6 +22,7 @@ class TemporallyDependentStateEstimator(nn.Module):
             feature_extract=True,
             feature_layer_nums=(9,),
             use_depth=False,
+            use_pretrained=True,
             device='cpu'
     ):
         """
@@ -51,6 +52,8 @@ class TemporallyDependentStateEstimator(nn.Module):
 
             use_depth (bool): Whether to use depth features or not
 
+            use_pretrained (bool): Whether to use pretrained ResNet model or not
+
             device (str): Device to send all sub modules to
         """
         # Always run super init first
@@ -62,7 +65,12 @@ class TemporallyDependentStateEstimator(nn.Module):
         self.depth_nets = None
         self.use_depth = use_depth
         self.aux_latent_dim = 0
-        self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim, feature_extract)
+        self.feature_net, _ = import_resnet(
+            num_resnet_layers,
+            latent_dim,
+            feature_extract,
+            use_pretrained=use_pretrained
+        )
         # Add additional feature layer outputs if requested
         if feature_layer_nums is not None:
             self.early_features = []
@@ -283,6 +291,7 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
             feature_extract=True,
             feature_layer_nums=(9,),
             use_depth=False,
+            use_pretrained=True,
             device='cpu'
     ):
         """
@@ -310,6 +319,8 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
 
             use_depth (bool): Whether to use depth features or not
 
+            use_pretrained (bool): Whether to use pretrained ResNet model or not
+
             device (str): Device to send all sub modules to
         """
         # Always run super init first
@@ -324,7 +335,12 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
         self.depth_nets = None
         self.aux_latent_dim = 0
         self.use_depth = use_depth
-        self.feature_net, _ = import_resnet(num_resnet_layers, latent_dim, feature_extract)
+        self.feature_net, _ = import_resnet(
+            num_resnet_layers,
+            latent_dim,
+            feature_extract,
+            use_pretrained=use_pretrained
+        )
         # Add additional feature layer outputs if requested
         if feature_layer_nums is not None:
             self.early_features = []

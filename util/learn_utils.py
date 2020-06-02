@@ -401,5 +401,5 @@ def rollout(
                 env.move_indicator(x1_pos)
 
             # Lastly, render
-            env.render()
-            env.render()
+            #env.render()
+            #env.render()
