@@ -96,14 +96,14 @@ class TemporallyDependentStateEstimator(nn.Module):
                             torch.nn.Conv2d(in_channels=C, out_channels=1, kernel_size=1),
                             torch.nn.MaxPool2d(2),
                             torch.nn.Flatten()
-                        ).to(device)
+                        )
                     )
                     # Define depth net for this layer
                     self.depth_nets.append(
                         torch.nn.Sequential(
                             *([torch.nn.AvgPool2d(2) for i in range(int(math.log(224**2 / (H*W // 4), 4)))] +
                             [torch.nn.InstanceNorm2d(1, affine=True), torch.nn.Flatten()])
-                        ).to(device)
+                        )
                     )
 
                     # Add the (flattened) output dimension to the auxiliary variable
@@ -116,11 +116,11 @@ class TemporallyDependentStateEstimator(nn.Module):
 
         # Define LSTM nets
         self.pre_measurement_rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim,
-                                           hidden_size=hidden_dim_pre_measurement).to(device)
-        self.pre_measurement_fc = nn.Linear(hidden_dim_pre_measurement, 7).to(device)
+                                           hidden_size=hidden_dim_pre_measurement)
+        self.pre_measurement_fc = nn.Linear(hidden_dim_pre_measurement, 7)
         self.post_measurement_rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim + 7,
-                                            hidden_size=hidden_dim_post_measurement).to(device)
-        self.post_measurement_fc = nn.Linear(hidden_dim_post_measurement, 7).to(device)
+                                            hidden_size=hidden_dim_post_measurement)
+        self.post_measurement_fc = nn.Linear(hidden_dim_post_measurement, 7)
         self.sequence_length = sequence_length
 
         # Define hidden and cell states
@@ -354,18 +354,22 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
                     _, C, H, W = feature.shape
                     # Create the auxiliary layer for this layer output
                     self.aux_nets.append(
-                        torch.nn.Sequential(
-                            torch.nn.Conv2d(in_channels=C, out_channels=1, kernel_size=1),
-                            torch.nn.MaxPool2d(2),
-                            torch.nn.Flatten()
-                        ).to(device)
+                        nn.DataParallel(
+                            torch.nn.Sequential(
+                                torch.nn.Conv2d(in_channels=C, out_channels=1, kernel_size=1),
+                                torch.nn.MaxPool2d(2),
+                                torch.nn.Flatten()
+                            )
+                        )
                     )
                     # Define depth net for this layer
                     self.depth_nets.append(
-                        torch.nn.Sequential(
-                            *([torch.nn.AvgPool2d(2) for i in range(int(math.log(224**2 / (H*W // 4), 4)))] +
-                            [torch.nn.InstanceNorm2d(1, affine=True), torch.nn.Flatten()])
-                        ).to(device)
+                        nn.DataParallel(
+                            torch.nn.Sequential(
+                                *([torch.nn.AvgPool2d(2) for i in range(int(math.log(224**2 / (H*W // 4), 4)))] +
+                                [torch.nn.InstanceNorm2d(1, affine=True), torch.nn.Flatten()])
+                            )
+                        )
                     )
 
                     # Add the (flattened) output dimension to the auxiliary variable
@@ -374,15 +378,18 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
                 # Lastly, reset the early features
                 self.early_features = []
 
+        # Send feature net to DataParallel
+        self.feature_net = nn.DataParallel(self.feature_net)
+
         print("Latent Dim + Aux Dim = {}".format(latent_dim + self.aux_latent_dim))
 
         # Define LSTM nets
-        self.rnn = nn.LSTM(input_size=latent_dim + self.aux_latent_dim + 7,
-                           hidden_size=hidden_dim).to(device)
-        self.fc = torch.nn.Sequential(
+        self.rnn = nn.DataParallel(nn.LSTM(input_size=latent_dim + self.aux_latent_dim + 7,
+                           hidden_size=hidden_dim))
+        self.fc = nn.DataParallel(torch.nn.Sequential(
             nn.Linear(hidden_dim, int(hidden_dim // 4)),
             nn.Linear(int(hidden_dim // 4), 7)
-        ).to(device)
+        ))
         self.sequence_length = sequence_length
 
         # Define hidden and cell states

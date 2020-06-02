@@ -75,7 +75,8 @@ def train(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
     # Make sure to send model to appropriate device
-    model.to(device)
+    if device != "cpu":
+        model.cuda()
 
     # Print filepath we're saving model to
     if save_model:
@@ -123,15 +124,16 @@ def train(
             if logging:
                 print("Running {}...".format(phase))
             for img, depth, x0bar, x0, x1, obj in dataloader:
-                # Pass all inputs to specified device (cpu or gpu)
-                img = img.to(device)
-                depth = depth.to(device)
-                x0bar = x0bar.to(device)
-                x0 = x0.to(device)
-                if train_obj_pose:
-                    obj = obj.to(device)
-                else:
-                    x1 = x1.to(device)
+                # Pass all inputs to cuda if requested
+                if device != "cpu":
+                    img = img.cuda()
+                    depth = depth.cuda()
+                    x0bar = x0bar.cuda()
+                    x0 = x0.cuda()
+                    if train_obj_pose:
+                        obj = obj.cuda()
+                    else:
+                        x1 = x1.cuda()
 
                 # squeeze 1st dim (only if we're not using sequences)
                 if not model.requires_sequence:
