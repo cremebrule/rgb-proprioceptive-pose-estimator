@@ -487,14 +487,13 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
 
     def reset_initial_state(self, batch_size):
         """
-        Resets any initial state. Doesn't actually do anything for this class since it doesn't have any temporal
-        dependencies
+        Resets any initial state
 
         Args:
             batch_size (int): Batch size currently being run
         """
-        self.rnn_h = torch.zeros((1, batch_size, self.hidden_dim), requires_grad=False)
-        self.rnn_c = torch.zeros((1, batch_size, self.hidden_dim), requires_grad=False)
+        self.rnn_h = torch.zeros((1, batch_size, self.hidden_dim), requires_grad=True)
+        self.rnn_c = torch.zeros((1, batch_size, self.hidden_dim), requires_grad=True)
 
         self.out_vec = []
 
