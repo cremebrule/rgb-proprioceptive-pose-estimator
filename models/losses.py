@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-DISTANCE_METRICS = {"l1", "l2", "linf"}
+DISTANCE_METRICS = {"l1", "l2", "linf", "combined"}
 
 
 class PoseDistanceLoss(nn.Module):
@@ -14,7 +14,7 @@ class PoseDistanceLoss(nn.Module):
         Initializes this custom loss for pose distance
 
         Args:
-            distance_metric (str): Distance metric to use. Options are l1, l2, and linf
+            distance_metric (str): Distance metric to use. Options are l1, l2, linf, or combined
             scale_factor (float): Scaling factor for final loss value
             epsilon (float): Tolerance to add to sqrt to prevent nan's from occurring (sqrt(0))
             position_only (bool): Whether to train for both position and orientation error or just position
@@ -61,13 +61,24 @@ class PoseDistanceLoss(nn.Module):
             # Compute pos error (cartesian distance)
             summed_pos_sq = torch.sum((predict_pos - true_pos).pow(2), dim=-1, keepdim=False)        # Shape (*)
             pos_dist = torch.sum(torch.sqrt(summed_pos_sq + self.epsilon))
-        else: # l1, linf case
+        elif self.distance_metric == "l1" or self.distance_metric == "linf":
             # Compute absolute values first
             dist_pos_abs = torch.abs(predict_pos - true_pos)
             if self.distance_metric == "l1":
                 pos_dist = torch.sum(dist_pos_abs)
             else:   # linf case
                 pos_dist = torch.sum(torch.max(dist_pos_abs, dim=-1)[0])
+        else:   #combined case
+            # Compute l2 loss
+            summed_pos_sq = torch.sum((predict_pos - true_pos).pow(2), dim=-1, keepdim=False)  # Shape (*)
+            l2_pos_dist = torch.sum(torch.sqrt(summed_pos_sq + self.epsilon))
+            # Compute l1 and linf losses
+            dist_pos_abs = torch.abs(predict_pos - true_pos)
+            l1_pos_dist = torch.sum(dist_pos_abs)
+            linf_pos_dist = torch.sum(torch.max(dist_pos_abs, dim=-1)[0])
+            # Combine distances
+            pos_dist = l2_pos_dist + l1_pos_dist + linf_pos_dist
+
 
         if not self.position_only:
             # Compute ori error (quat distance) - angle = acos(2<q1,q2>^2 - 1)
