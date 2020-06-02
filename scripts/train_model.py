@@ -31,6 +31,7 @@ parser.add_argument("--use_placement_initializer", action="store_true", help="Wh
 parser.add_argument("--feature_extract", action="store_true", help="Whether ResNet will be set to feature extract mode or not")
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
+parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
 args = parser.parse_args()
 
 # Params to define
@@ -107,6 +108,7 @@ if __name__ == '__main__':
     print("Model: {}".format(args.model))
     print("Env: {}".format(args.env))
     print("Robots: {}".format(args.robots))
+    print("Motion: {}".format(args.motion))
     print("Depth: {}".format(args.use_depth))
     print("Object: {}".format(args.obj_name))
     print("Horizon: {}".format(horizon))
@@ -188,6 +190,7 @@ if __name__ == '__main__':
         env=env,
         use_depth=args.use_depth,
         obj_name=args.obj_name,
+        motion=args.motion,
     )
 
     # Define params to pass to training

@@ -18,7 +18,7 @@ models = {'naive', 'td', 'tdo'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_100hzn_10000ep_31-05-2020_20-26-58.pth",
+                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_5000ep_02-06-2020_11-04-33.pth",
                     help="Where to load saved dict for model")
 parser.add_argument("--controller", type=str, default="OSC_POSE", help="Which controller to use in env")
 parser.add_argument("--camera_name", type=str, default="frontview", help="Name of camera to render for observations")
@@ -35,6 +35,7 @@ parser.add_argument("--use_placement_initializer", action="store_true", help="Wh
 parser.add_argument("--feature_extract", action="store_true", help="Whether ResNet will be set to feature extract mode or not")
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
+parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
 args = parser.parse_args()
 
 # Params to define
@@ -159,4 +160,5 @@ if __name__ == '__main__':
         model=model,
         env=env,
         params=params,
+        motion=args.motion,
     )

@@ -36,7 +36,7 @@
 # --mem is memory per node; default is 4000 MB per CPU, remember to ask for enough mem to match your CPU request, since
 # sherlock automatically allocates 4 Gigs of RAM/CPU, if you ask for 8 CPUs you will get 32 Gigs of RAM, so either
 # leave --mem commented out or request >= to the RAM needed for your CPU request.  It will also accept mem. in units, ie "--mem=4G"
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 # to request multiple threads/CPUs use the -c option, on Sherlock we use 1 thread/CPU, 16 CPUs on each normal compute node 4Gigs RAM per CPU.  Here we will request just 1.
 #SBATCH -c 1
 #################
@@ -67,12 +67,13 @@ python train_model.py \
 --noise_scale 0.001 \
 --latent_dim 512 \
 --lr 0.001 \
---n_train_episodes_per_epoch 25 \
---n_val_episodes_per_epoch 5 \
+--n_train_episodes_per_epoch 5 \
+--n_val_episodes_per_epoch 2 \
 --env Lift \
 --robots Panda \
 --use_placement_initializer \
---obj_name cube
+--obj_name cube \
+--motion up
 
 
 # done

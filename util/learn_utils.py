@@ -249,6 +249,7 @@ def rollout(
         model,
         env,
         params,
+        motion,
         ):
     """
     Performs training for a given model for a specified number of epochs.
@@ -257,6 +258,7 @@ def rollout(
         model (nn.Module): Model to train
         env (MujocoEnv): robosuite environment to run simulation from
         params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
+        motion (str): Type of motion to use. Supported options are "random" and "up" currently
 
     Returns:
         None
@@ -310,16 +312,22 @@ def rollout(
         done = False
 
         while not done:
-            # Grab random action for entire action space (only once every few substeps!)
-            if sub_traj_ct == sub_traj_steps:
-                # Re-sample action
-                action = np.random.uniform(low, high)
-                # Reset traj counter and re-sample substeps count
-                sub_traj_ct = 0
-                sub_traj_steps = np.random.randint(5, 15)
-            else:
-                # increment counter
-                sub_traj_ct += 1
+            # Create action based on type specified
+            if motion == "random":
+                # Grab random action for entire action space (only once every few substeps!)
+                if sub_traj_ct == sub_traj_steps:
+                    # Re-sample action
+                    action = np.random.uniform(low, high)
+                    # Reset traj counter and re-sample substeps count
+                    sub_traj_ct = 0
+                    sub_traj_steps = np.random.randint(5, 15)
+                else:
+                    # increment counter
+                    sub_traj_ct += 1
+            else:  # type "up"
+                # Move upwards
+                action = np.zeros(len(low))
+                action[2] = high[2]
 
             # Execute action
             obs, reward, done, _ = env.step(action)

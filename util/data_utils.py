@@ -4,12 +4,15 @@ import numpy as np
 import torch
 
 
+MOTIONS = {"random", "up"}
+
+
 class MultiEpisodeDataset(Dataset):
     """
     Class for processing multiple episodes as a dataset
     """
 
-    def __init__(self, env, use_depth=False, obj_name=None, custom_transform=None):
+    def __init__(self, env, use_depth=False, obj_name=None, motion="random", custom_transform=None):
         """
         Initializes custom dataset class
 
@@ -23,6 +26,7 @@ class MultiEpisodeDataset(Dataset):
             env (MujocoEnv): Env to grab online sim data from
             use_depth (bool): Whether to use depth observations or not
             obj_name (str): Name of object to grab pose values from environment
+            motion (str): Type of motion to use. Supported options are "random" and "up" currently
             custom_transform (Transform): (Optional) Custom transform to be applied to image observations. Default is
                 None, which results in default transform being applied (Normalization + Scaling)
         """
@@ -31,6 +35,10 @@ class MultiEpisodeDataset(Dataset):
         self.obj_name = obj_name
         self.use_depth = use_depth
         self.is_two_arm = "TwoArm" in str(type(self.env))
+        if motion in MOTIONS:
+            self.motion = motion
+        else:
+            raise ValueError("Invalid motion specified. {} supported, {} requested.".format(MOTIONS, motion))
 
         if custom_transform:
             self.transform = custom_transform
@@ -104,16 +112,22 @@ class MultiEpisodeDataset(Dataset):
 
             # Start grabbing data after each step
             while not done:
-                # Grab random action for entire action space (only once every few substeps!)
-                if sub_traj_ct == sub_traj_steps:
-                    # Re-sample action
-                    action = np.random.uniform(low, high)
-                    # Reset traj counter and re-sample substeps count
-                    sub_traj_ct = 0
-                    sub_traj_steps = np.random.randint(5, 15)
-                else:
-                    # increment counter
-                    sub_traj_ct += 1
+                # Create action based on type specified
+                if self.motion == "random":
+                    # Grab random action for entire action space (only once every few substeps!)
+                    if sub_traj_ct == sub_traj_steps:
+                        # Re-sample action
+                        action = np.random.uniform(low, high)
+                        # Reset traj counter and re-sample substeps count
+                        sub_traj_ct = 0
+                        sub_traj_steps = np.random.randint(5, 15)
+                    else:
+                        # increment counter
+                        sub_traj_ct += 1
+                else:   # type "up"
+                    # Move upwards
+                    action = np.zeros(len(low))
+                    action[2] = high[2]
 
                 # Execute action
                 obs, reward, done, _ = self.env.step(action)
