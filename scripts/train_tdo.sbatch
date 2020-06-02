@@ -13,7 +13,7 @@
 #################
 #set a job name
 #{{JOB_NAME}}
-#SBATCH --job-name="TDOSE_Lift_Panda_20_SeqLength"
+#SBATCH --job-name="TDOSE_Lift_Panda_20_SeqLength_L2_1LSF"
 #################
 #a file for job output, you can check job progress, append the job ID with %j to make it unique
 #SBATCH --output=/cvgl2/u/jdwong/test_output/%j.out
@@ -36,7 +36,7 @@
 # --mem is memory per node; default is 4000 MB per CPU, remember to ask for enough mem to match your CPU request, since
 # sherlock automatically allocates 4 Gigs of RAM/CPU, if you ask for 8 CPUs you will get 32 Gigs of RAM, so either
 # leave --mem commented out or request >= to the RAM needed for your CPU request.  It will also accept mem. in units, ie "--mem=4G"
-#SBATCH --mem=32G
+#SBATCH --mem=16G
 # to request multiple threads/CPUs use the -c option, on Sherlock we use 1 thread/CPU, 16 CPUs on each normal compute node 4Gigs RAM per CPU.  Here we will request just 1.
 #SBATCH -c 1
 #################
@@ -73,7 +73,9 @@ python train_model.py \
 --robots Panda \
 --use_placement_initializer \
 --obj_name cube \
---motion up
+--motion up \
+--distance_metric l2 \
+--loss_scale_factor 1.0
 
 
 # done

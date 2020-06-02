@@ -32,6 +32,8 @@ parser.add_argument("--feature_extract", action="store_true", help="Whether ResN
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
+parser.add_argument("--distance_metric", type=str, default="l2", help="Distance metric to use for loss")
+parser.add_argument("--loss_scale_factor", type=float, default=1.0, help="Scaling factor for Pose loss")
 args = parser.parse_args()
 
 # Params to define
@@ -93,9 +95,10 @@ env = suite.make(
 #    "x1_loss": nn.MSELoss(reduction='sum'),
 #}
 criterion = {
-    "x0_loss": PoseDistanceLoss(),
-    "x1_loss": PoseDistanceLoss(),
-    "obj_loss": PoseDistanceLoss(),
+    "x0_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor),
+    "x1_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor),
+    "obj_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor),
+    "val_loss": PoseDistanceLoss(),
 }
 
 
@@ -114,7 +117,9 @@ if __name__ == '__main__':
     print("Horizon: {}".format(horizon))
     print("Initialization Noise: {}".format(initialization_noise))
     print("Noise Scale: {}".format(noise_scale))
-    print("Loss Rate: {}".format(lr))
+    print("Learning Rate: {}".format(lr))
+    print("Loss Scaling Factor: {}".format(args.loss_scale_factor))
+    print("Distance Metric: {}".format(args.distance_metric))
     print("Feature Extraction: {} ".format(feature_extract))
     print("Latent Dim: {}".format(latent_dim))
     print("Sequence Length: {}".format(sequence_length))

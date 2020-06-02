@@ -158,6 +158,8 @@ def train(
                         obj_out = model(img, depth, x0bar)
                         # Calculate loss
                         loss = criterion["obj_loss"](obj_out, obj)
+                        # Calculate error
+                        err = criterion["val_loss"](obj_out, obj)
                     else:
                         x0_out, x1_out = model(img, depth, x0bar)      # Each output is shape (S, N, 7)
                         # Calculate losses
@@ -165,6 +167,8 @@ def train(
                         loss_x1 = criterion["x1_loss"](x1_out, x1)
                         # Sum the losses
                         loss = loss_x0 + loss_x1
+                        # Calculate error
+                        err = criterion["val_loss"](x1_out, x1)
 
                     # Run backward pass + optimizer step if in training phase
                     if phase == 'train':
@@ -174,7 +178,7 @@ def train(
 
                 # Evaluate statistics as we go along
                 running_loss += loss.item()
-                running_err += loss.item() if train_obj_pose else loss_x1.item()
+                running_err += err.item()
 
             # Determine overall epoch loss and performance (this is the per-step loss / err averaged over entire epoch)
             epoch_loss = running_loss / (len(dataloader.dataset) * num_episodes)
