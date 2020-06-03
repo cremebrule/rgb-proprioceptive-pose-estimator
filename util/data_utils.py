@@ -105,6 +105,8 @@ class MultiEpisodeDataset(Dataset):
             true_obj = []
             sub_traj_steps = 10
             sub_traj_ct = 0
+            steps = 0
+            direction = 1
             action = np.random.uniform(low, high)
             done = False
 
@@ -127,7 +129,10 @@ class MultiEpisodeDataset(Dataset):
                 else:   # type "up"
                     # Move upwards
                     action = np.zeros(len(low))
-                    action[2] = high[2]
+                    action[2] = direction * high[2]
+                    # Also check if we need to switch directions
+                    if (steps + 1) % 20 == 0:
+                        direction = -direction
 
                 # Execute action
                 obs, reward, done, _ = self.env.step(action)
@@ -156,6 +161,9 @@ class MultiEpisodeDataset(Dataset):
                 if self.obj_name is not None:
                     # Get object observations if requested
                     true_obj.append(np.concatenate([obs[self.obj_name + "_pos"], obs[self.obj_name + "_quat"]]))
+
+                # Increment step
+                steps += 1
 
             # After episode completes, add to new_data
             new_data["imgs"].append(torch.stack(imgs))

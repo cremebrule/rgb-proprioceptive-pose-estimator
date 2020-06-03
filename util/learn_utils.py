@@ -11,6 +11,8 @@ import time
 import os
 import copy
 
+import matplotlib.pyplot as plt
+
 from models.time_sensitive import TemporallyDependentObjectStateEstimator
 
 
@@ -254,6 +256,7 @@ def rollout(
         env,
         params,
         motion,
+        error_function
         ):
     """
     Performs training for a given model for a specified number of epochs.
@@ -263,6 +266,7 @@ def rollout(
         env (MujocoEnv): robosuite environment to run simulation from
         params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
         motion (str): Type of motion to use. Supported options are "random" and "up" currently
+        error_function (nn.Module): Loss / Error function that calculates error metric for the rollout
 
     Returns:
         None
@@ -315,6 +319,19 @@ def rollout(
         # Variable to know when episode is done
         done = False
 
+        # Running error
+        episode_err = 0
+
+        # Track number of episode steps
+        steps = 0
+
+        # Reset other per-episode vars
+        direction = 1
+
+        # Notify user a new episode is starting
+        print("\nNEW EPISODE")
+        print("*" * 30)
+
         while not done:
             # Create action based on type specified
             if motion == "random":
@@ -331,7 +348,10 @@ def rollout(
             else:  # type "up"
                 # Move upwards
                 action = np.zeros(len(low))
-                action[2] = high[2]
+                action[2] = direction * high[2]
+                # Also check if we need to switch directions
+                if (steps + 1) % 20 == 0:
+                    direction = -direction
 
             # Execute action
             obs, reward, done, _ = env.step(action)
@@ -339,6 +359,8 @@ def rollout(
             # Get relevant observations
             # Need to preprocess image first before appending
             img = obs[params["camera_name"] + "_image"]
+            #plt.imshow(np.transpose(img, (0,1,2)))
+            #plt.show()
             img = transform(img).float()
             x0 = np.concatenate([obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
             x0bar = x0 + np.random.multivariate_normal(mean=np.zeros(7), cov=np.eye(7) * params["noise_scale"])
@@ -373,7 +395,10 @@ def rollout(
                 obj_position = obj_pose[:3]
                 obj_position_true = obj_pose_true[:3]
 
-                print("OBJECT: Predicted pos: {}, True pos: {}".format(obj_position, obj_position_true))
+                # Calculate error
+                err = error_function(obj_out, true_obj)
+
+                print("OBJECT: Predicted pos: {}, True pos: {}, Err: {:.3f}".format(obj_position, obj_position_true, err))
 
                 # Set the indicator object to this xyz location to visualize
                 # env.move_indicator(x0_pos[:3])
@@ -392,14 +417,29 @@ def rollout(
                 x1_pos = x1_out.squeeze().detach().numpy()[:3]
                 x1_pos_true = true_other.squeeze().detach().numpy()[:3]
 
+                # Calculate error
+                err = error_function(x1_out, true_other)
+
                 #print("SELF: Predicted pos: {}, True pos: {}".format(x0_pos, x0_pos_true))
-                print("OTHER: Predicted pos: {}, True pos: {}".format(x1_pos, x1_pos_true))
+                print("OTHER: Predicted pos: {}, True pos: {}, Err: {:.3f}".format(x1_pos, x1_pos_true, err))
 
 
                 # Set the indicator object to this xyz location to visualize
                 #env.move_indicator(x0_pos[:3])
                 env.move_indicator(x1_pos)
 
+            # Add error to running error
+            episode_err += err
+
+            # Increment episode step
+            steps += 1
+
             # Lastly, render
             #env.render()
             #env.render()
+
+        # Close all plots
+        plt.close('all')
+
+        # At the end, print the episode error
+        print("EPISODE COMPLETED -- Total err: {:.3f}, Per-Step Err: {:.3f}".format(episode_err, episode_err / steps))

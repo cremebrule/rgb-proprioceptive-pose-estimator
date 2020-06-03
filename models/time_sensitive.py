@@ -394,6 +394,10 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
                 # Lastly, reset the early features
                 self.early_features = []
 
+            # Lastly, wrap aux and depth nets in nn.ModuleList so it shows up in the appropriate param list
+            self.aux_nets = nn.ModuleList(self.aux_nets)
+            self.depth_nets = nn.ModuleList(self.depth_nets)
+
         # Send feature net to DataParallel
         self.feature_net = nn.DataParallel(self.feature_net)
 

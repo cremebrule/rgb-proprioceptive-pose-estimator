@@ -7,6 +7,8 @@ from util.data_utils import MultiEpisodeDataset
 from util.learn_utils import train
 import argparse
 
+from torchsummary import summary
+
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
@@ -36,6 +38,9 @@ parser.add_argument("--motion", type=str, default="random", help="Type of robot 
 parser.add_argument("--distance_metric", type=str, default="l2", help="Distance metric to use for loss")
 parser.add_argument("--loss_scale_factor", type=float, default=1.0, help="Scaling factor for Pose loss")
 parser.add_argument("--n_epochs", type=int, default=5000, help="Number of epochs")
+parser.add_argument("--load_checkpoint", action="store_true", help="Whether to load prior trained model")
+parser.add_argument("--checkpoint_model_path", type=str, default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_25000ep_02-06-2020_18-49-01.pth",
+                    help="Path to checkpoint .pth file to load into model")
 args = parser.parse_args()
 
 # Params to define
@@ -185,14 +190,20 @@ if __name__ == '__main__':
     else:
         pass
 
+    # Load the saved parameters if requested
+    if args.load_checkpoint:
+        model.load_state_dict(torch.load(args.checkpoint_model_path, map_location=torch.device(device)))
+
     # Define optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     param_list = list(model.parameters())
 
+    #summary(model, ((1, 3, 244, 244), (1, 1, 244, 244), (1, 7)))
+
     # Make sure we're updating the appropriate weights during optimization
     #for param in param_list:
     #    if param.requires_grad:
-    #        print(param.shape)
+    #        print("name: {}, shape: {}".format(param.name, param.shape))
 
     # Define the dataset
     print("Loading dataset...")
