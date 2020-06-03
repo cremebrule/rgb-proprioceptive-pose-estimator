@@ -35,6 +35,7 @@ parser.add_argument("--obj_name", type=str, default=None, help="Object name to g
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
 parser.add_argument("--distance_metric", type=str, default="l2", help="Distance metric to use for loss")
 parser.add_argument("--loss_scale_factor", type=float, default=1.0, help="Scaling factor for Pose loss")
+parser.add_argument("--n_epochs", type=int, default=5000, help="Number of epochs")
 args = parser.parse_args()
 
 # Params to define
@@ -61,7 +62,6 @@ hidden_dim = 512
 
 # Training params
 lr = args.lr
-n_epochs = 1000
 n_train_episodes_per_epoch = args.n_train_episodes_per_epoch
 n_val_episodes_per_epoch = args.n_val_episodes_per_epoch
 
@@ -119,6 +119,7 @@ if __name__ == '__main__':
     print("Horizon: {}".format(horizon))
     print("Initialization Noise: {}".format(initialization_noise))
     print("Noise Scale: {}".format(noise_scale))
+    print("Number of Epochs: {}".format(args.n_epochs))
     print("Learning Rate: {}".format(lr))
     print("Loss Scaling Factor: {}".format(args.loss_scale_factor))
     print("Distance Metric: {}".format(args.distance_metric))
@@ -215,7 +216,7 @@ if __name__ == '__main__':
         dataset=dataset,
         criterion=criterion,
         optimizer=optimizer,
-        num_epochs=n_epochs,
+        num_epochs=args.n_epochs,
         num_train_episodes_per_epoch=n_train_episodes_per_epoch,
         num_val_episodes_per_epoch=n_val_episodes_per_epoch,
         params=params,
