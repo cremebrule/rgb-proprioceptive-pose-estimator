@@ -4,9 +4,15 @@ import torch
 import torch.nn as nn
 from models.naive import NaiveEndEffectorStateEstimator
 from models.time_sensitive import *
+from models.losses import PoseDistanceLoss
 from util.data_utils import MultiEpisodeDataset
 from util.learn_utils import rollout
 import argparse
+import imageio
+import numpy as np
+
+from signal import signal, SIGINT
+from sys import exit
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -18,7 +24,7 @@ models = {'naive', 'td', 'tdo'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_5000ep_02-06-2020_12-01-18.pth",
+                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_25000ep_03-06-2020_13-37-28.pth",
                     help="Where to load saved dict for model")
 parser.add_argument("--controller", type=str, default="OSC_POSE", help="Which controller to use in env")
 parser.add_argument("--camera_name", type=str, default="frontview", help="Name of camera to render for observations")
@@ -36,7 +42,35 @@ parser.add_argument("--feature_extract", action="store_true", help="Whether ResN
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
+parser.add_argument("--model_outputs_file", type=str, default=None, help="Path to model outputs to load")
+parser.add_argument("--record_video", action="store_true", help="If specified, records video")
 args = parser.parse_args()
+
+# Set numpy and torch seed
+np.random.seed(3)
+torch.manual_seed(3)
+
+# Define callbacks
+video_writer = imageio.get_writer("test.mp4", fps=10) if args.record_video else None
+
+
+def handler(signal_received, frame):
+    # Handle any cleanup here
+    print('SIGINT or CTRL-C detected. Closing video writer and exiting gracefully')
+    video_writer.close()
+    exit(0)
+
+
+# Tell Python to run the handler() function when SIGINT is recieved
+signal(SIGINT, handler)
+
+# Load model outputs if defined
+if args.model_outputs_file is not None:
+    with open(args.model_outputs_file, 'rb') as f:
+        model_outputs = np.load(f)
+else:
+    model_outputs = None
+
 
 # Params to define
 
@@ -67,11 +101,13 @@ n_train_episodes_per_epoch = args.n_train_episodes_per_epoch
 n_val_episodes_per_epoch = args.n_val_episodes_per_epoch
 
 # Define placement initializer for object
+rotation_axis = 'y' if args.obj_name == 'hammer' else 'z'
 placement_initializer = UniformRandomSampler(
-    x_range=[-0.375, 0.375],
-    y_range=[-0.375, 0.375],
+    x_range=[-0.35, 0.35],
+    y_range=[-0.35, 0.35],
     ensure_object_boundary_in_range=False,
-    z_rotation=None,
+    rotation=None,
+    rotation_axis=rotation_axis,
 ) if args.use_placement_initializer else None
 
 
@@ -80,14 +116,15 @@ controller_config = suite.load_controller_config(default_controller=args.control
 env = suite.make(
     args.env,
     robots=args.robots,
-    has_renderer=False,
+    #has_renderer=True,
+    #render_camera=camera_name,
     has_offscreen_renderer=True,
     camera_depths=args.use_depth,
     use_camera_obs=True,
     horizon=horizon,
     camera_names=camera_name,
     controller_configs=controller_config,
-    #use_indicator_object=True,
+    use_indicator_object=args.record_video,
     initialization_noise=initialization_noise,
     placement_initializer=placement_initializer
 )
@@ -148,11 +185,56 @@ if __name__ == '__main__':
     # Load the saved parameters
     model.load_state_dict(torch.load(args.model_path, map_location=torch.device('cpu')))
 
+    #### DEBUGGING ##
+    # Check params
+    import numpy as np
+    model1_params = list(model.parameters())
+
+    model2 = TemporallyDependentObjectStateEstimator(
+        object_name=args.obj_name,
+        hidden_dim=hidden_dim,
+        num_resnet_layers=num_resnet_layers,
+        latent_dim=latent_dim,
+        sequence_length=sequence_length,
+        feature_extract=args.feature_extract,
+        feature_layer_nums=feature_layer_nums,
+        use_depth=args.use_depth,
+    )
+    model2.load_state_dict(torch.load(args.model_path, map_location=torch.device('cpu')))
+    model2_params = list(model2.parameters())
+
+    print("Length saved params: {}".format(len(model1_params)))
+
+    for param1, param2 in zip(model1_params, model2_params):
+        print("requires grad: {}".format(param1.requires_grad))
+        print("norm: {}".format(np.linalg.norm(param1.data.numpy() - param2.data.numpy())))
+
+    print("Checking aux nets...")
+    for aux1, aux2 in zip(model.aux_nets, model2.aux_nets):
+        for param1, param2 in zip(list(aux1.parameters()), list(aux2.parameters())):
+            print("requires grad: {}".format(param1.requires_grad))
+            print("norm: {}".format(np.linalg.norm(param1.data.numpy() - param2.data.numpy())))
+            #print("norm: {}".format(aux1.weight.data.numpy() - aux2.weight.data.numpy()))
+
+    print("Checking depth nets...")
+    for aux1, aux2 in zip(model.depth_nets, model2.depth_nets):
+        for param1, param2 in zip(list(aux1.parameters()), list(aux2.parameters())):
+            print("requires grad: {}".format(param1.requires_grad))
+            print("param1 data: {}".format(param1.data.numpy()))
+            print("norm: {}".format(np.linalg.norm(param1.data.numpy() - param2.data.numpy())))
+
+    #### END DEBUGGING ##
+    #exit(0)
+
+
     # Define params to pass to training
     params = {
         "camera_name": camera_name,
         "noise_scale": noise_scale
     }
+
+    # Define eval error function
+    error_function = PoseDistanceLoss()
 
     # Now rollout!
     print("Rollout...")
@@ -161,4 +243,8 @@ if __name__ == '__main__':
         env=env,
         params=params,
         motion=args.motion,
+        error_function=error_function,
+        num_episodes=10,
+        model_outputs=model_outputs,
+        video_writer=video_writer,
     )

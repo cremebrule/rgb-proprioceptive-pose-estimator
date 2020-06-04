@@ -256,7 +256,10 @@ def rollout(
         env,
         params,
         motion,
-        error_function
+        error_function,
+        num_episodes=10,
+        model_outputs=None,
+        video_writer=None,
         ):
     """
     Performs training for a given model for a specified number of epochs.
@@ -267,6 +270,11 @@ def rollout(
         params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
         motion (str): Type of motion to use. Supported options are "random" and "up" currently
         error_function (nn.Module): Loss / Error function that calculates error metric for the rollout
+        num_episodes (int): Number of episodes to run to test
+        model_outputs (np.array): Numpy array of shape (N*H, 3), where N=number of episodes and H is steps per episode
+            If specified, will automatically send placement indicator to this location at each timestep. If None, then
+            a new array will be created and store model outputs, which will be saved to a .npy file
+        video_writer (boolimageio.get_writer): If specified, will save frames to this writer
 
     Returns:
         None
@@ -303,8 +311,15 @@ def rollout(
     model.eval()
     model.rollout = True
 
+    # If model outputs not specified, create list to hold values
+    if model_outputs is None:
+        model_outputs = []
+
+    # Define global step counter
+    global_steps = 0
+
     # Get variable to know when robosuite env is done
-    while(True):    # Run indefinitely
+    for _ in range(num_episodes):    # Run for specified number of episodes
         # Reset env
         env.reset()
 
@@ -359,6 +374,9 @@ def rollout(
             # Get relevant observations
             # Need to preprocess image first before appending
             img = obs[params["camera_name"] + "_image"]
+            # Add this image to video writer if specified
+            if video_writer is not None:
+                video_writer.append_data(img[::-1])
             #plt.imshow(np.transpose(img, (0,1,2)))
             #plt.show()
             img = transform(img).float()
@@ -400,9 +418,14 @@ def rollout(
 
                 print("OBJECT: Predicted pos: {}, True pos: {}, Err: {:.3f}".format(obj_position, obj_position_true, err))
 
-                # Set the indicator object to this xyz location to visualize
-                # env.move_indicator(x0_pos[:3])
-                env.move_indicator(obj_position)
+                # If model outputs is a list, add the model output obj_position to this
+                if type(model_outputs) is list:
+                    model_outputs.append(obj_position)
+                else:
+                    # This is a loaded model outputs; move obj_position to this location
+                    # Set the indicator object to this xyz location to visualize
+                    env.move_indicator(model_outputs[global_steps])
+                    #env.move_indicator(obj_position)
 
             else:
                 true_other = np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]])
@@ -423,16 +446,20 @@ def rollout(
                 #print("SELF: Predicted pos: {}, True pos: {}".format(x0_pos, x0_pos_true))
                 print("OTHER: Predicted pos: {}, True pos: {}, Err: {:.3f}".format(x1_pos, x1_pos_true, err))
 
-
-                # Set the indicator object to this xyz location to visualize
-                #env.move_indicator(x0_pos[:3])
-                env.move_indicator(x1_pos)
+                if type(model_outputs) is list:
+                    model_outputs.append(x1_pos)
+                else:
+                    # This is a loaded model outputs; move obj_position to this location
+                    # Set the indicator object to this xyz location to visualize
+                    env.move_indicator(model_outputs[global_steps])
+                    #env.move_indicator(x1_pos)
 
             # Add error to running error
             episode_err += err
 
-            # Increment episode step
+            # Increment episode step and global step
             steps += 1
+            global_steps += 1
 
             # Lastly, render
             #env.render()
@@ -440,6 +467,11 @@ def rollout(
 
         # Close all plots
         plt.close('all')
+
+        # Save model outputs if we created one this time
+        if type(model_outputs) is list:
+            with open('model_outputs.npy', 'wb') as f:
+                np.save(f, np.array(model_outputs))
 
         # At the end, print the episode error
         print("EPISODE COMPLETED -- Total err: {:.3f}, Per-Step Err: {:.3f}".format(episode_err, episode_err / steps))

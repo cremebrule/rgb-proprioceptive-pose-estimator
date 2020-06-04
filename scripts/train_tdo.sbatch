@@ -13,7 +13,7 @@
 #################
 #set a job name
 #{{JOB_NAME}}
-#SBATCH --job-name="TDOSE_Lift_Panda_20_SeqLength_L2_1LSF_Pretrain_5000epochs"
+#SBATCH --job-name="TDOSE_TwoArmHandoff_PandaSawyer_20_SeqLength_L2_1LSF_Pretrain_5000epochs"
 #################
 #a file for job output, you can check job progress, append the job ID with %j to make it unique
 #SBATCH --output=/cvgl2/u/jdwong/test_output/%j.out
@@ -70,10 +70,10 @@ python train_model.py \
 --lr 0.001 \
 --n_train_episodes_per_epoch 5 \
 --n_val_episodes_per_epoch 2 \
---env Lift \
---robots Panda \
+--env TwoArmHandoff \
+--robots Panda Sawyer \
 --use_placement_initializer \
---obj_name cube \
+--obj_name hammer \
 --motion up \
 --distance_metric l2 \
 --loss_scale_factor 1.0 \

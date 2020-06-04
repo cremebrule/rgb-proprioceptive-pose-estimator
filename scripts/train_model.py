@@ -7,8 +7,6 @@ from util.data_utils import MultiEpisodeDataset
 from util.learn_utils import train
 import argparse
 
-from torchsummary import summary
-
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
@@ -71,11 +69,13 @@ n_train_episodes_per_epoch = args.n_train_episodes_per_epoch
 n_val_episodes_per_epoch = args.n_val_episodes_per_epoch
 
 # Define placement initializer for object
+rotation_axis = 'y' if args.obj_name == 'hammer' else 'z'
 placement_initializer = UniformRandomSampler(
-    x_range=[-0.375, 0.375],
-    y_range=[-0.375, 0.375],
+    x_range=[-0.35, 0.35],
+    y_range=[-0.35, 0.35],
     ensure_object_boundary_in_range=False,
-    z_rotation=None,
+    rotation=None,
+    rotation_axis=rotation_axis,
 ) if args.use_placement_initializer else None
 
 
