@@ -1,23 +1,29 @@
 import torch
 import torch.nn as nn
+from robosuite.utils.transform_utils import quat_distance, quat2axisangle
 
 
 DISTANCE_METRICS = {"l1", "l2", "linf", "combined"}
+POSE_LOSS_MODES = {"position", "pose", "val"}
 
 
 class PoseDistanceLoss(nn.Module):
     """
     Simple class to compute pose distance (position distance + orientation distance)
     """
-    def __init__(self, distance_metric="l2", scale_factor=1.0, epsilon=1e-4, position_only=True):
+    def __init__(self, distance_metric="l2", scale_factor=1.0, alpha=1.0, epsilon=1e-4, mode="pose"):
         """
         Initializes this custom loss for pose distance
 
         Args:
             distance_metric (str): Distance metric to use. Options are l1, l2, linf, or combined
             scale_factor (float): Scaling factor for final loss value
+            alpha (float): Scaling factor to weight orientation error relative to position error
             epsilon (float): Tolerance to add to sqrt to prevent nan's from occurring (sqrt(0))
-            position_only (bool): Whether to train for both position and orientation error or just position
+            mode (str): Mode to run this loss criterion -- options are as follows:
+                "position" : only position error is used
+                "pose" : full pose (position + orientation) error is used
+                "val" : validation mode. Outputs the summed L2 position error and radian angle error
         """
         # Always run superclass init first
         super(PoseDistanceLoss, self).__init__()
@@ -29,8 +35,13 @@ class PoseDistanceLoss(nn.Module):
             raise ValueError("Invalid distance metric specified; available are: {}, requested {}.".format(
                 DISTANCE_METRICS, distance_metric))
         self.scale_factor = scale_factor
+        self.alpha = alpha
         self.epsilon = epsilon
-        self.position_only = position_only
+        if mode in POSE_LOSS_MODES:
+            self.mode = mode
+        else:
+            raise ValueError("Invalid loss mode specified; available are: {}, requested {}.".format(
+                POSE_LOSS_MODES, mode))
 
     def forward(self, prediction, truth):
         """
@@ -39,10 +50,10 @@ class PoseDistanceLoss(nn.Module):
             Assumes prediction and truth are of the same size
 
         Args:
-            prediction (torch.Tensor): Prediction of estimated pose (*, 7)
+            prediction (torch.Tensor): Prediction of estimated pose (*, 7) of form (x,y,z,i,j,k,w)
                 Note: Assumes UNNORMALIZED quat part
-            truth (torch.Tensor): Ground truth state of pose, of shape (*, 7)
-                Note: Assumes NORMALIZED quat part
+            truth (torch.Tensor): Ground truth state of pose, of shape (*, 7) of form (x,y,z,i,j,k,w)
+                Note: Assumes NORMALIZED quat part with POSITIVE w value
 
         Returns:
             distance (torch.Tensor): (Summed) distances across all inputs. Shape = (1,)
@@ -79,17 +90,33 @@ class PoseDistanceLoss(nn.Module):
             # Combine distances
             pos_dist = l2_pos_dist + l1_pos_dist + linf_pos_dist
 
-
-        if not self.position_only:
-            # Compute ori error (quat distance) - angle = acos(2<q1,q2>^2 - 1)
+        # Additionally compute orientation error if requested
+        if self.mode == "val":
+            # We directly compute the summed absolute angle error in radians
+            # Note: we don't care about torch-compatible computations since we're not backpropping in this case
+            # Convert torch tensors to numpy arrays
+            predict_ori = predict_ori.view(-1, 4).detach().numpy()
+            true_ori = true_ori.view(-1, 4).detach().numpy()
+            # Create var to hold summed orientation error
+            summed_angle_err = 0
+            # Loop over all quats and compute angle error
+            for i in range(predict_ori.shape[0]):
+                _, angle = quat2axisangle(quat_distance(predict_ori[i], true_ori[i]))
+                summed_angle_err += abs(angle)
+            # Immediately return the position and orientation errors
+            return pos_dist.detach().numpy(), summed_angle_err
+        elif self.mode == "pose":
+            # Compute ori error (quat distance), roughly d(q1,q2) = 1 - <q1,q2>^2 where <> is the inner product
+            # see https://math.stackexchange.com/questions/90081/quaternion-distance
             inner_product = torch.sum(predict_ori * true_ori, dim=-1, keepdim=False)    # Shape (*)
-            ori_dist_squared = torch.sum((torch.acos(2 * inner_product.pow(2) - 1)).pow(2))
-        else:
+            ori_dist_squared = torch.sum(1 - inner_product.pow(2))
+            # We also add in penalty if w component is negative
+            # see https://dspace.mit.edu/bitstream/handle/1721.1/119699/1078151125-MIT.pdf?sequence=1
+            w_penalty = torch.clamp(-predict_ori[:, :, -1], min=0)
+            ori_dist_squared += torch.sum(w_penalty)
+        else:   # case "position"
+            # No orientation loss used
             ori_dist_squared = 0
 
         # Return summed dist
-        #print(summed_pos_sq)
-        #print(pos_dist)
-        #print(inner_product)
-        #print(ori_dist_squared)
-        return self.scale_factor * (pos_dist + ori_dist_squared)
+        return self.scale_factor * (pos_dist + self.alpha * ori_dist_squared)

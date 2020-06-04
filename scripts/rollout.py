@@ -234,7 +234,7 @@ if __name__ == '__main__':
     }
 
     # Define eval error function
-    error_function = PoseDistanceLoss()
+    error_function = PoseDistanceLoss(mode="val")
 
     # Now rollout!
     print("Rollout...")

@@ -14,6 +14,7 @@ import copy
 import matplotlib.pyplot as plt
 
 from models.time_sensitive import TemporallyDependentObjectStateEstimator
+from util.data_utils import standardize_quat
 
 
 def train(
@@ -62,9 +63,6 @@ def train(
     # Create variable for storing current time
     since = time.time()
 
-    # Store validation history
-    val_history = []
-
     # Store best model and its performance
     best_model = copy.deepcopy(model.state_dict())
     best_err = np.inf       # lower is better
@@ -109,7 +107,8 @@ def train(
 
             # Reset running loss and performance error
             running_loss = 0.0
-            running_err = 0.0
+            running_pos_err = 0.0
+            running_ori_err = 0.0
 
             # Grab new data from dataset
             dataloader.dataset.refresh_data(num_episodes, params["camera_name"], params["noise_scale"])
@@ -161,7 +160,7 @@ def train(
                         # Calculate loss
                         loss = criterion["obj_loss"](obj_out, obj)
                         # Calculate error
-                        err = criterion["val_loss"](obj_out, obj)
+                        pos_err, ori_err = criterion["val_loss"](obj_out, obj)
                     else:
                         x0_out, x1_out = model(img, depth, x0bar)      # Each output is shape (S, N, 7)
                         # Calculate losses
@@ -170,7 +169,7 @@ def train(
                         # Sum the losses
                         loss = loss_x0 + loss_x1
                         # Calculate error
-                        err = criterion["val_loss"](x1_out, x1)
+                        pos_err, ori_err = criterion["val_loss"](x1_out, x1)
 
                     # Run backward pass + optimizer step if in training phase
                     if phase == 'train':
@@ -180,11 +179,13 @@ def train(
 
                 # Evaluate statistics as we go along
                 running_loss += loss.item()
-                running_err += err.item()
+                running_pos_err += pos_err
+                running_ori_err += ori_err
 
             # Determine overall epoch loss and performance (this is the per-step loss / err averaged over entire epoch)
             epoch_loss = running_loss / (len(dataloader.dataset) * num_episodes)
-            epoch_err = running_err / (len(dataloader.dataset) * num_episodes)
+            epoch_pos_err = running_pos_err / (len(dataloader.dataset) * num_episodes)
+            epoch_ori_err = running_ori_err / (len(dataloader.dataset) * num_episodes)
 
             # Determine current time
             time_elapsed = time.time() - since
@@ -193,20 +194,22 @@ def train(
             if logging:
                 if phase == 'train':
                     writer.add_scalar("Loss/train", epoch_loss, epoch)
-                    writer.add_scalar("Err/train", epoch_err, epoch)
+                    writer.add_scalar("Err_pos/train", epoch_pos_err, epoch)
+                    writer.add_scalar("Err_ori/train", epoch_ori_err, epoch)
                 else:  # validation phase
                     writer.add_scalar("Loss/val", epoch_loss, epoch)
-                    writer.add_scalar("Err/val", epoch_err, epoch)
+                    writer.add_scalar("Err_pos/val", epoch_pos_err, epoch)
+                    writer.add_scalar("Err_ori/val", epoch_ori_err, epoch)
 
             # Print out the stats for this epoch
             if logging:
-                print('{} Loss: {:.4f}, Err: {:.4f}. Time elapsed = {:.0f}m {:.0f}s'.format(
-                    phase, epoch_loss, epoch_err, time_elapsed // 60, time_elapsed % 60))
+                print('{} Loss: {:.4f}, PosErr: {:.4f}, OriErr: {:.4f}. Time elapsed = {:.0f}m {:.0f}s'.format(
+                    phase, epoch_loss, epoch_pos_err, epoch_ori_err, time_elapsed // 60, time_elapsed % 60))
 
             # Update val history if this is a val loop
             if phase == 'val':
-                val_history.append(epoch_err)
-
+                # Epoch err is the loss used in this case
+                epoch_err = epoch_loss
                 # Save this model if it is the best performing one
                 if epoch_err < best_err:
                     best_err = epoch_err
@@ -341,7 +344,8 @@ def rollout(
         done = False
 
         # Running error
-        episode_err = 0
+        episode_pos_err = 0
+        episode_ori_err = 0
 
         # Track number of episode steps
         steps = 0
@@ -394,7 +398,7 @@ def rollout(
             #plt.imshow(np.transpose(img, (0,1,2)))
             #plt.show()
             img = transform(img).float()
-            x0 = np.concatenate([obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
+            x0 = np.concatenate([obs["robot0_eef_pos"], standardize_quat(obs["robot0_eef_quat"])])
             x0bar = x0 + np.random.multivariate_normal(mean=np.zeros(7), cov=np.eye(7) * params["noise_scale"])
             # Renormalize the orientation part
             mag = np.linalg.norm(x0bar[3:])
@@ -415,7 +419,7 @@ def rollout(
 
             # Now add model-specific observations
             if eval_obj_pose:
-                true_obj = np.concatenate([obs[model.object_name + "_pos"], obs[model.object_name + "_quat"]])
+                true_obj = np.concatenate([obs[model.object_name + "_pos"], standardize_quat(obs[model.object_name + "_quat"])])
                 true_obj = torch.tensor(true_obj, dtype=torch.float, requires_grad=False).unsqueeze(
                     dim=0).unsqueeze(dim=0)
 
@@ -424,52 +428,61 @@ def rollout(
 
                 obj_pose = obj_out.squeeze().detach().numpy()
                 obj_pose_true = true_obj.squeeze().detach().numpy()
-                obj_position = obj_pose[:3]
-                obj_position_true = obj_pose_true[:3]
+
+                # Normalize model output quat
+                obj_pose[3:] /= np.sqrt(np.sum(np.power(obj_pose[3:], 2)))
 
                 # Calculate error
-                err = error_function(obj_out, true_obj)
+                pos_err, ori_err = error_function(obj_out, true_obj)
 
-                print("OBJECT: Predicted pos: {}, True pos: {}, Err: {:.3f}".format(obj_position, obj_position_true, err))
+                print("{}: || POS: Est: {}, True: {}, Err: {:.3f} || ORI: Est: {}, True: {}, Err: {:.3f}".format(
+                    model.object_name, obj_pose[:3], obj_pose_true[:3], pos_err,
+                    obj_pose[3:], obj_pose_true[3:], ori_err)
+                )
 
                 # If model outputs is a list, add the model output obj_position to this
                 if type(model_outputs) is list:
-                    model_outputs.append(obj_position)
+                    model_outputs.append(obj_pose[:3])
                 else:
                     # This is a loaded model outputs; move obj_position to this location
                     # Set the indicator object to this xyz location to visualize
                     env.move_indicator(model_outputs[global_steps])
-                    #env.move_indicator(obj_position)
 
             else:
-                true_other = np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]])
+                true_other = np.concatenate([obs["robot1_eef_pos"], standardize_quat(obs["robot1_eef_quat"])])
                 true_other = torch.tensor(true_other, dtype=torch.float, requires_grad=False).unsqueeze(
                     dim=0).unsqueeze(dim=0)
 
                 # Now run forward pass to get estimates
                 x0_out, x1_out = model(img, depth, measurement_self)
 
-                x0_pos = x0_out.squeeze().detach().numpy()
-                x0_pos_true = true_self.squeeze().detach().numpy()
-                x1_pos = x1_out.squeeze().detach().numpy()[:3]
-                x1_pos_true = true_other.squeeze().detach().numpy()[:3]
+                x0_pose = x0_out.squeeze().detach().numpy()
+                x0_pose_true = true_self.squeeze().detach().numpy()
+                x1_pose = x1_out.squeeze().detach().numpy()
+                x1_pose_true = true_other.squeeze().detach().numpy()
+
+                # Normalize model output quat
+                x0_pose[3:] /= np.sqrt(np.sum(np.power(x0_pose[3:], 2)))
+                x1_pose[3:] /= np.sqrt(np.sum(np.power(x1_pose[3:], 2)))
 
                 # Calculate error
-                err = error_function(x1_out, true_other)
+                pos_err, ori_err = error_function(x1_pose, x1_pose_true)
 
-                #print("SELF: Predicted pos: {}, True pos: {}".format(x0_pos, x0_pos_true))
-                print("OTHER: Predicted pos: {}, True pos: {}, Err: {:.3f}".format(x1_pos, x1_pos_true, err))
+                print("OTHER: || POS: Est: {}, True: {}, Err: {:.3f} || ORI: Est: {}, True: {}, Err: {:.3f}".format(
+                    x1_pose[:3], x1_pose_true[:3], pos_err,
+                    x1_pose[3:], x1_pose_true[3:], ori_err)
+                )
 
                 if type(model_outputs) is list:
-                    model_outputs.append(x1_pos)
+                    model_outputs.append(x1_pose[:3])
                 else:
                     # This is a loaded model outputs; move obj_position to this location
                     # Set the indicator object to this xyz location to visualize
                     env.move_indicator(model_outputs[global_steps])
-                    #env.move_indicator(x1_pos)
 
             # Add error to running error
-            episode_err += err
+            episode_pos_err += pos_err
+            episode_ori_err += ori_err
 
             # Increment episode step and global step
             steps += 1
@@ -488,4 +501,5 @@ def rollout(
                 np.save(f, np.array(model_outputs))
 
         # At the end, print the episode error
-        print("EPISODE COMPLETED -- Total err: {:.3f}, Per-Step Err: {:.3f}".format(episode_err, episode_err / steps))
+        print("EPISODE COMPLETED -- Total Pos/Ori err: {:.3f} m / {:.3f} rad, Per-Step Err: {:.3f} m / {:.3f} rad"
+              .format(episode_pos_err, episode_ori_err, episode_pos_err / steps, episode_ori_err / steps))

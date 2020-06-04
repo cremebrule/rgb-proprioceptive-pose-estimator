@@ -159,7 +159,7 @@ class MultiEpisodeDataset(Dataset):
                 #img = Image.fromarray(np.uint8(np.transpose(obs[camera_name + "_image"], (2,0,1))))       # new shape should be (C, H, W)
                 #print(img.shape)
                 imgs.append(self.transform(img).float())
-                x0 = np.concatenate([obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
+                x0 = np.concatenate([obs["robot0_eef_pos"], standardize_quat(obs["robot0_eef_quat"])])
                 x0bar = x0 + np.random.multivariate_normal(mean=np.zeros(7), cov=np.eye(7) * noise_scale)
                 # Renormalize the orientation part
                 mag = np.linalg.norm(x0bar[3:])
@@ -168,10 +168,12 @@ class MultiEpisodeDataset(Dataset):
                 true_self.append(x0)
                 # Get second arm pose if environment has multiple arms
                 if self.is_two_arm:
-                    true_other.append(np.concatenate([obs["robot1_eef_pos"], obs["robot1_eef_quat"]]))
+                    true_other.append(np.concatenate([obs["robot1_eef_pos"],
+                                                      standardize_quat(obs["robot1_eef_quat"])]))
                 if self.obj_name is not None:
                     # Get object observations if requested
-                    true_obj.append(np.concatenate([obs[self.obj_name + "_pos"], obs[self.obj_name + "_quat"]]))
+                    true_obj.append(np.concatenate([obs[self.obj_name + "_pos"],
+                                                    standardize_quat(obs[self.obj_name + "_quat"])]))
 
                 # Increment step
                 steps += 1
@@ -200,3 +202,10 @@ class MultiEpisodeDataset(Dataset):
 
         # Now save the new_data as self.data
         self.data = new_data
+
+
+def standardize_quat(quat):
+    """
+    Standardizes quaternion of form (x,y,z,w) such that the returned quaternion always has positive w component
+    """
+    return -quat if quat[-1] < 0 else quat

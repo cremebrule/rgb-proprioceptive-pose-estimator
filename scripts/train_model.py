@@ -34,7 +34,9 @@ parser.add_argument("--use_pretrained", action="store_true", help="Whether to us
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
 parser.add_argument("--distance_metric", type=str, default="l2", help="Distance metric to use for loss")
+parser.add_argument("--loss_mode", type=str, default="pose", help="Type of loss to use. Options are 'position' or 'pose'")
 parser.add_argument("--loss_scale_factor", type=float, default=1.0, help="Scaling factor for Pose loss")
+parser.add_argument("--alpha", type=float, default=0.5, help="Orientation loss scaling factor relative to position error")
 parser.add_argument("--n_epochs", type=int, default=5000, help="Number of epochs")
 parser.add_argument("--load_checkpoint", action="store_true", help="Whether to load prior trained model")
 parser.add_argument("--checkpoint_model_path", type=str, default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_25000ep_02-06-2020_18-49-01.pth",
@@ -96,15 +98,11 @@ env = suite.make(
 )
 
 # Define loss criterion
-#criterion = {
-#    "x0_loss": nn.MSELoss(reduction='sum'),
-#    "x1_loss": nn.MSELoss(reduction='sum'),
-#}
 criterion = {
-    "x0_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor),
-    "x1_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor),
-    "obj_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor),
-    "val_loss": PoseDistanceLoss(),
+    "x0_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor, alpha=args.alpha, mode=args.loss_mode),
+    "x1_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor, alpha=args.alpha, mode=args.loss_mode),
+    "obj_loss": PoseDistanceLoss(distance_metric=args.distance_metric, scale_factor=args.loss_scale_factor, alpha=args.alpha, mode=args.loss_mode),
+    "val_loss": PoseDistanceLoss(mode="val"),
 }
 
 
