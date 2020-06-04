@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 
-MOTIONS = {"random", "up"}
+MOTIONS = {"random", "up", "up_random"}
 
 
 class MultiEpisodeDataset(Dataset):
@@ -26,7 +26,9 @@ class MultiEpisodeDataset(Dataset):
             env (MujocoEnv): Env to grab online sim data from
             use_depth (bool): Whether to use depth observations or not
             obj_name (str): Name of object to grab pose values from environment
-            motion (str): Type of motion to use. Supported options are "random" and "up" currently
+            motion (str): Type of motion to use. Supported options are "random", "up", and "up_random" currently
+                "up_random" only applies to two-armed environments, where the first arm goes up but the second arm
+                exhibits random motion
             custom_transform (Transform): (Optional) Custom transform to be applied to image observations. Default is
                 None, which results in default transform being applied (Normalization + Scaling)
         """
@@ -91,6 +93,7 @@ class MultiEpisodeDataset(Dataset):
 
         # Get action limits
         low, high = self.env.action_spec
+        arm_dim = int(len(low) / 2) if self.is_two_arm else len(low)
 
         for i in range(num_episodes):
             # Reset env
@@ -115,7 +118,14 @@ class MultiEpisodeDataset(Dataset):
             # Start grabbing data after each step
             while not done:
                 # Create action based on type specified
-                if self.motion == "random":
+                if self.motion == "up":
+                    # Move upwards
+                    action = np.zeros(len(low))
+                    action[2] = direction * high[2]
+                    # Also check if we need to switch directions
+                    if (steps + 1) % 20 == 0:
+                        direction = -direction
+                else:   # "random" or "up_random"
                     # Grab random action for entire action space (only once every few substeps!)
                     if sub_traj_ct == sub_traj_steps:
                         # Re-sample action
@@ -126,13 +136,14 @@ class MultiEpisodeDataset(Dataset):
                     else:
                         # increment counter
                         sub_traj_ct += 1
-                else:   # type "up"
-                    # Move upwards
-                    action = np.zeros(len(low))
-                    action[2] = direction * high[2]
-                    # Also check if we need to switch directions
-                    if (steps + 1) % 20 == 0:
-                        direction = -direction
+                    # If we're doing "up_random", overwrite the first half of the action
+                    if self.motion == "up_random":
+                        # Move upwards for first arm
+                        action[:arm_dim] = np.zeros(arm_dim)
+                        action[2] = direction * high[2]
+                        # Also check if we need to switch directions
+                        if (steps + 1) % 20 == 0:
+                            direction = -direction
 
                 # Execute action
                 obs, reward, done, _ = self.env.step(action)

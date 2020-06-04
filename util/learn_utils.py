@@ -268,7 +268,9 @@ def rollout(
         model (nn.Module): Model to train
         env (MujocoEnv): robosuite environment to run simulation from
         params (dict): Dict of parameters required for training. Should include entries: "camera_name", "noise_scale"
-        motion (str): Type of motion to use. Supported options are "random" and "up" currently
+        motion (str): Type of motion to use. Supported options are "random", "up", and "up_random" currently
+                "up_random" only applies to two-armed environments, where the first arm goes up but the second arm
+                exhibits random motion
         error_function (nn.Module): Loss / Error function that calculates error metric for the rollout
         num_episodes (int): Number of episodes to run to test
         model_outputs (np.array): Numpy array of shape (N*H, 3), where N=number of episodes and H is steps per episode
@@ -279,6 +281,9 @@ def rollout(
     Returns:
         None
     """
+    # Check env type
+    is_two_arm = "TwoArm" in str(type(env))
+
     # Check which model we have so we know what we're evaluating
     eval_obj_pose = True if isinstance(model, TemporallyDependentObjectStateEstimator) else False
 
@@ -303,6 +308,7 @@ def rollout(
 
     # Get action limits
     low, high = env.action_spec
+    arm_dim = int(len(low) / 2) if is_two_arm else len(low)
 
     # Setup printing options for numbers
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
@@ -349,7 +355,14 @@ def rollout(
 
         while not done:
             # Create action based on type specified
-            if motion == "random":
+            if motion == "up":
+                # Move upwards
+                action = np.zeros(len(low))
+                action[2] = direction * high[2]
+                # Also check if we need to switch directions
+                if (steps + 1) % 20 == 0:
+                    direction = -direction
+            else:  # "random" or "up_random"
                 # Grab random action for entire action space (only once every few substeps!)
                 if sub_traj_ct == sub_traj_steps:
                     # Re-sample action
@@ -360,13 +373,14 @@ def rollout(
                 else:
                     # increment counter
                     sub_traj_ct += 1
-            else:  # type "up"
-                # Move upwards
-                action = np.zeros(len(low))
-                action[2] = direction * high[2]
-                # Also check if we need to switch directions
-                if (steps + 1) % 20 == 0:
-                    direction = -direction
+                # If we're doing "up_random", overwrite the first half of the action
+                if motion == "up_random":
+                    # Move upwards for first arm
+                    action[:arm_dim] = np.zeros(arm_dim)
+                    action[2] = direction * high[2]
+                    # Also check if we need to switch directions
+                    if (steps + 1) % 20 == 0:
+                        direction = -direction
 
             # Execute action
             obs, reward, done, _ = env.step(action)
