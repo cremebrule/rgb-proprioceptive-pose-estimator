@@ -46,9 +46,14 @@ args = parser.parse_args()
 # Params to define
 
 # robosuite env params
+is_two_arm = True if "TwoArm" in args.env else False
 camera_name = args.camera_name
 horizon = args.horizon
+
+# Define initialization noise (make separate if we're using multi-arm env)
 initialization_noise = "default" if args.model == 'tdo' else {"magnitude": 0.5, "type": "uniform"}
+if is_two_arm:
+    initialization_noise = [initialization_noise, {"magnitude": 0.5, "type": "uniform"}]
 
 # Model params
 noise_scale = args.noise_scale
