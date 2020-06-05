@@ -2,7 +2,7 @@ import robosuite as suite
 from robosuite.models.tasks import UniformRandomSampler
 import torch
 import torch.nn as nn
-from models.naive import NaiveEndEffectorStateEstimator
+from models.naive import *
 from models.time_sensitive import *
 from models.losses import PoseDistanceLoss
 from util.data_utils import MultiEpisodeDataset
@@ -18,13 +18,13 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 # List of available models to train
-models = {'naive', 'td', 'tdo'}
+models = {'n', 'no', 'td', 'tdo'}
 
 # Arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="naive", help="Which mode to run. Options are 'naive' or 'td'")
+parser.add_argument("--model", type=str, default="n", help="Which mode to run. Options are 'n', 'no', 'td', or 'tdo'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_25000ep_03-06-2020_13-37-28.pth",
+                    default="../log/runs/TemporallyDependentObjectStateEstimator_TwoArmHandoff_40hzn_25000ep_04-06-2020_12-34-59.pth",
                     help="Where to load saved dict for model")
 parser.add_argument("--controller", type=str, default="OSC_POSE", help="Which controller to use in env")
 parser.add_argument("--camera_name", type=str, default="frontview", help="Name of camera to render for observations")
@@ -32,13 +32,12 @@ parser.add_argument("--horizon", type=int, default=100, help="Horizon per episod
 parser.add_argument("--sequence_length", type=int, default=10, help="Sequence length for LSTMs")
 parser.add_argument("--noise_scale", type=float, default=0.001, help="Noise scale for self measurements")
 parser.add_argument("--latent_dim", type=int, default=1024, help="Dimension of output from ResNet")
-parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for Adam optimizer")
-parser.add_argument("--n_train_episodes_per_epoch", type=int, default=10, help="Number of training episodes per epoch")
-parser.add_argument("--n_val_episodes_per_epoch", type=int, default=2, help="Number of validation episodes per epoch")
+parser.add_argument("--hidden_dim", nargs="+", type=int, default=512, help="Hidden dimensions in FC network (naive only), or LSTM net (td/o only)")
 parser.add_argument("--env", type=str, default="TwoArmLift", help="Environment to run")
 parser.add_argument("--robots", nargs="+", type=str, default=["Panda", "Sawyer"], help="Which robot(s) to use in the env")
 parser.add_argument("--use_placement_initializer", action="store_true", help="Whether to use custom placement initializer")
 parser.add_argument("--feature_extract", action="store_true", help="Whether ResNet will be set to feature extract mode or not")
+parser.add_argument("--no_proprioception", action="store_true", help="If set, will not leverage proprioceptive measurements during rollout")
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
@@ -75,30 +74,20 @@ else:
 # Params to define
 
 # robosuite env params
+is_two_arm = True if "TwoArm" in args.env else False
 camera_name = args.camera_name
 horizon = args.horizon
-initialization_noise = "default" if args.model == 'tdo' else {"magnitude": 0.5, "type": "uniform"}
+
+# Define initialization noise (make separate if we're using multi-arm env)
+initialization_noise = "default" if args.model in {'tdo', 'no'} else {"magnitude": 0.5, "type": "uniform"}
+if is_two_arm:
+    initialization_noise = [initialization_noise, {"magnitude": 0.5, "type": "uniform"}]
 
 # Model params
 noise_scale = args.noise_scale
 num_resnet_layers = 50
-feature_extract = False
-latent_dim = args.latent_dim
-pre_hidden_dims = [512, 128]
-post_hidden_dims = [512, 128]
-pre_lstm_h_dim = 512
-post_lstm_h_dim = 512
 sequence_length = args.sequence_length
 feature_layer_nums = (9,)
-
-# Model params for tdo
-hidden_dim = 512
-
-# Training params
-lr = args.lr
-n_epochs = 1000
-n_train_episodes_per_epoch = args.n_train_episodes_per_epoch
-n_val_episodes_per_epoch = args.n_val_episodes_per_epoch
 
 # Define placement initializer for object
 rotation_axis = 'y' if args.obj_name == 'hammer' else 'z'
@@ -148,35 +137,52 @@ if __name__ == '__main__':
     # Create model
     print("Loading model...")
     model = None
-    if args.model == 'naive':
+    if args.model == 'n':
         model = NaiveEndEffectorStateEstimator(
-            hidden_dims_pre_measurement=pre_hidden_dims,
-            hidden_dims_post_measurement=post_hidden_dims,
+            hidden_dims_pre_measurement=args.hidden_dim,
+            hidden_dims_post_measurement=args.hidden_dim,
             num_resnet_layers=num_resnet_layers,
-            latent_dim=latent_dim,
+            latent_dim=args.latent_dim,
             feature_extract=args.feature_extract,
+        )
+    elif args.model == 'no':
+        model = NaiveObjectStateEstimator(
+            object_name=args.obj_name,
+            hidden_dims=args.hidden_dim,
+            num_resnet_layers=num_resnet_layers,
+            latent_dim=args.latent_dim,
+            feature_extract=args.feature_extract,
+            feature_layer_nums=feature_layer_nums,
+            use_depth=args.use_depth,
+            use_pretrained=args.use_pretrained,
+            no_proprioception=args.no_proprioception,
         )
     elif args.model == 'td':
         model = TemporallyDependentStateEstimator(
-            hidden_dim_pre_measurement=pre_lstm_h_dim,
-            hidden_dim_post_measurement=post_lstm_h_dim,
+            hidden_dim_pre_measurement=args.hidden_dim[0],
+            hidden_dim_post_measurement=args.hidden_dim[0],
             num_resnet_layers=num_resnet_layers,
-            latent_dim=latent_dim,
+            latent_dim=args.latent_dim,
             sequence_length=sequence_length,
             feature_extract=args.feature_extract,
             feature_layer_nums=feature_layer_nums,
             use_depth=args.use_depth,
+            use_pretrained=args.use_pretrained,
+            device='cpu'
         )
     elif args.model == 'tdo':
         model = TemporallyDependentObjectStateEstimator(
             object_name=args.obj_name,
-            hidden_dim=hidden_dim,
+            hidden_dim=args.hidden_dim[0],
             num_resnet_layers=num_resnet_layers,
-            latent_dim=latent_dim,
+            latent_dim=args.latent_dim,
             sequence_length=sequence_length,
             feature_extract=args.feature_extract,
             feature_layer_nums=feature_layer_nums,
             use_depth=args.use_depth,
+            use_pretrained=args.use_pretrained,
+            no_proprioception=args.no_proprioception,
+            device='cpu'
         )
 
     else:
@@ -185,6 +191,7 @@ if __name__ == '__main__':
     # Load the saved parameters
     model.load_state_dict(torch.load(args.model_path, map_location=torch.device('cpu')))
 
+    """
     #### DEBUGGING ##
     # Check params
     import numpy as np
@@ -192,7 +199,7 @@ if __name__ == '__main__':
 
     model2 = TemporallyDependentObjectStateEstimator(
         object_name=args.obj_name,
-        hidden_dim=hidden_dim,
+        hidden_dim=args.hidden_dim,
         num_resnet_layers=num_resnet_layers,
         latent_dim=latent_dim,
         sequence_length=sequence_length,
@@ -225,6 +232,7 @@ if __name__ == '__main__':
 
     #### END DEBUGGING ##
     #exit(0)
+    """
 
 
     # Define params to pass to training

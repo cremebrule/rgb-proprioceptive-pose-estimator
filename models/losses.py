@@ -112,7 +112,7 @@ class PoseDistanceLoss(nn.Module):
             ori_dist_squared = torch.sum(1 - inner_product.pow(2))
             # We also add in penalty if w component is negative
             # see https://dspace.mit.edu/bitstream/handle/1721.1/119699/1078151125-MIT.pdf?sequence=1
-            w_penalty = torch.clamp(-predict_ori[:, :, -1], min=0)
+            w_penalty = torch.clamp(-predict_ori[..., -1], min=0)
             ori_dist_squared += torch.sum(w_penalty)
         else:   # case "position"
             # No orientation loss used

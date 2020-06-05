@@ -292,6 +292,7 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
             feature_layer_nums=(9,),
             use_depth=False,
             use_pretrained=True,
+            no_proprioception=False,
             device='cpu'
     ):
         """
@@ -321,13 +322,17 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
 
             use_pretrained (bool): Whether to use pretrained ResNet model or not
 
+            no_proprioception (bool): If true, creates model that will not leverage proprioceptive measurements
+                for state estimation
+
             device (str): Device to send all sub modules to
         """
         # Always run super init first
         super(TemporallyDependentObjectStateEstimator, self).__init__()
 
-        # Save object name
+        # Save relevant args
         self.object_name = object_name
+        self.use_proprioception = not no_proprioception
 
         # Import ResNet as feature model
         self.early_features = None
@@ -403,9 +408,15 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
 
         print("Latent Dim + Aux Dim = {}".format(latent_dim + self.aux_latent_dim))
 
+        # Input dim should be latent_dim + aux_latent_dim + 7 if we're using proprioceptive measurements
+        # else just latent_dim + aux_latent_dim
+        input_dim = latent_dim + self.aux_latent_dim
+        if self.use_proprioception:
+            input_dim += 7
+
         # Define LSTM nets
-        self.rnn = nn.DataParallel(nn.LSTM(input_size=latent_dim + self.aux_latent_dim + 7,
-                           hidden_size=hidden_dim))
+        self.rnn = nn.DataParallel(nn.LSTM(input_size=input_dim,
+                                           hidden_size=hidden_dim))
         self.fc = nn.DataParallel(torch.nn.Sequential(
             nn.Linear(hidden_dim, int(hidden_dim // 4)),
             nn.Linear(int(hidden_dim // 4), 7)
@@ -453,7 +464,6 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
             pre_out (torch.Tensor): output from pre-measurement branch of forward pass, of shape (S, N, 7)
             post_out (torch.Tensor): output from post-measurement branch of forward pass, of shape (S, N, 7)
         """
-        # TODO: Check to make sure ResNet is in same eval() or train() mode as top level layers
         # First, reshape imgs before passing through ResNet
         S, N, C, H, W = img.shape
         img = img.view(-1, C, H, W)
@@ -483,8 +493,9 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
         # Reshape features
         features = features.view(S, N, -1)                              # Output shape (S, N, latent_dim + aux_dim)
 
-        # Concat these features with measured eef pose
-        features = torch.cat((features, self_measurement), dim=-1)      # Output shape (S, N, latent_dim + aux_dim + 7)
+        # Concat these features with measured eef pose if we're using proprioceptive measurements
+        if self.use_proprioception:
+            features = torch.cat((features, self_measurement), dim=-1)      # Output shape (S, N, latent_dim + aux_dim + 7)
 
         # Pass features through RNN
         if not self.rollout:

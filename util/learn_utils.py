@@ -13,7 +13,8 @@ import copy
 
 import matplotlib.pyplot as plt
 
-from models.time_sensitive import TemporallyDependentObjectStateEstimator
+from models.time_sensitive import *
+from models.naive import *
 from util.data_utils import standardize_quat
 
 
@@ -54,7 +55,7 @@ def train(
         best_err (float): Best val loss from training
     """
     # Check which model we have so we know what we're training
-    train_obj_pose = True if isinstance(model, TemporallyDependentObjectStateEstimator) else False
+    train_obj_pose = True if hasattr(model, "object_name") else False
 
     # Get exact date and time to save model
     now = datetime.now()

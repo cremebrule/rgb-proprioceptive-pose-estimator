@@ -13,7 +13,7 @@
 #################
 #set a job name
 #{{JOB_NAME}}
-#SBATCH --job-name="TDOSE_TwoArmHandoff_PandaSawyer_obj_robot1eef_20_SeqLength_Lcombined_1LSF_Pretrain_5000epochs_NoProprioception"
+#SBATCH --job-name="NOSE_TwoArmHandoff_PandaSawyer_obj_robot1eef_20_SeqLength_Lcombined_1LSF_Pretrain_5000epochs"
 #################
 #a file for job output, you can check job progress, append the job ID with %j to make it unique
 #SBATCH --output=/cvgl2/u/jdwong/test_output/%j.out
@@ -59,14 +59,14 @@ export PYTHONPATH=$PYTHONPATH:/cvgl2/u/jdwong/PAIR/handoff
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/sailhome/jdwong/.mujoco/mujoco200/bin
 
 python train_model.py \
---model tdo \
+--model no \
 --controller OSC_POSITION \
 --camera_name robot0_eye_in_hand \
 --horizon 20 \
 --sequence_length 20 \
 --noise_scale 0.001 \
 --latent_dim 512 \
---hidden_dim 512 \
+--hidden_dim 1024 256 64 \
 --n_epochs 5000 \
 --lr 0.001 \
 --n_train_episodes_per_epoch 5 \
@@ -80,8 +80,7 @@ python train_model.py \
 --loss_scale_factor 1.0 \
 --loss_mode pose \
 --alpha 0.5 \
---use_pretrained \
---no_proprioception
+--use_pretrained
 
 
 # done
