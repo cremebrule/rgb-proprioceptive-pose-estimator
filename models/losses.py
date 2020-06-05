@@ -95,8 +95,8 @@ class PoseDistanceLoss(nn.Module):
             # We directly compute the summed absolute angle error in radians
             # Note: we don't care about torch-compatible computations since we're not backpropping in this case
             # Convert torch tensors to numpy arrays
-            predict_ori = predict_ori.view(-1, 4).detach().numpy()
-            true_ori = true_ori.view(-1, 4).detach().numpy()
+            predict_ori = predict_ori.view(-1, 4).cpu().detach().numpy()
+            true_ori = true_ori.view(-1, 4).cpu().detach().numpy()
             # Create var to hold summed orientation error
             summed_angle_err = 0
             # Loop over all quats and compute angle error
@@ -104,7 +104,7 @@ class PoseDistanceLoss(nn.Module):
                 _, angle = quat2axisangle(quat_distance(predict_ori[i], true_ori[i]))
                 summed_angle_err += abs(angle)
             # Immediately return the position and orientation errors
-            return pos_dist.detach().numpy(), summed_angle_err
+            return pos_dist.cpu().detach().numpy(), summed_angle_err
         elif self.mode == "pose":
             # Compute ori error (quat distance), roughly d(q1,q2) = 1 - <q1,q2>^2 where <> is the inner product
             # see https://math.stackexchange.com/questions/90081/quaternion-distance
