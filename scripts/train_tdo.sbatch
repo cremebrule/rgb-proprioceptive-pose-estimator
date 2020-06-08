@@ -13,7 +13,7 @@
 #################
 #set a job name
 #{{JOB_NAME}}
-#SBATCH --job-name="TDOSE_TwoArmHandoff_PandaSawyer_obj_robot1eef_20_SeqLength_Lcombined_1LSF_Pretrain_5000epochs_NoProprioception"
+#SBATCH --job-name="TDOSE_TwoArmHandoff_PandaSawyer_obj_robot1eef_20_SeqLength_Lcombined_1LSF_Pretrain_10000epochs"
 #################
 #a file for job output, you can check job progress, append the job ID with %j to make it unique
 #SBATCH --output=/cvgl2/u/jdwong/test_output/%j.out
@@ -23,13 +23,13 @@
 #################
 #time you think you need; default is 2 hours
 #format could be dd-hh:mm:ss, hh:mm:ss, mm:ss, or mm
-#SBATCH --time=48:00:00
+#SBATCH --time=96:00:00
 #################
 # Quality of Service (QOS); think of it as sending your job into a special queue; --qos=long for with a max job length of 7 days.
 # uncomment ##SBATCH --qos=long if you want your job to run longer than 48 hours, which is the default for normal partition,
 # NOTE- in the hns partition the default max run time is 7 days , so you wont need to include qos, also change to normal partition
 # since dev max run time is 2 hours.
-##SBATCH --qos=long
+#SBATCH --qos=long
 # We are submitting to the dev partition, there are several on sherlock: normal, gpu, bigmem (jobs requiring >64Gigs RAM)
 ##SBATCH -p dev
 #################
@@ -67,7 +67,7 @@ python train_model.py \
 --noise_scale 0.001 \
 --latent_dim 512 \
 --hidden_dim 512 \
---n_epochs 5000 \
+--n_epochs 10000 \
 --lr 0.001 \
 --n_train_episodes_per_epoch 5 \
 --n_val_episodes_per_epoch 2 \
@@ -80,8 +80,7 @@ python train_model.py \
 --loss_scale_factor 1.0 \
 --loss_mode pose \
 --alpha 0.5 \
---use_pretrained \
---no_proprioception
+--use_pretrained
 
 
 # done

@@ -485,7 +485,7 @@ class TemporallyDependentObjectStateEstimator(nn.Module):
                                   self.depth_nets]
                 # Combine these features
                 aux_features = [aux_feature * depth_feature for aux_feature, depth_feature in
-                                  zip(aux_features, depth_features)]
+                                zip(aux_features, depth_features)]
 
             # Concat these synthesized features into main feature array
             features = torch.cat((features, *aux_features), dim=-1)

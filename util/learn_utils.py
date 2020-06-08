@@ -289,7 +289,8 @@ def rollout(
     is_two_arm = "TwoArm" in str(type(env))
 
     # Check which model we have so we know what we're evaluating
-    eval_obj_pose = True if isinstance(model, TemporallyDependentObjectStateEstimator) else False
+    eval_obj_pose = True if isinstance(model, TemporallyDependentObjectStateEstimator) or \
+        isinstance(model, NaiveObjectStateEstimator) else False
 
     # Check whether model uses depth or not
     use_depth = model.use_depth
@@ -328,6 +329,10 @@ def rollout(
     # Define global step counter
     global_steps = 0
 
+    # Define total running errors
+    total_pos_err = []
+    total_ori_err = []
+
     # Get variable to know when robosuite env is done
     for _ in range(num_episodes):    # Run for specified number of episodes
         # Reset env
@@ -345,8 +350,8 @@ def rollout(
         done = False
 
         # Running error
-        episode_pos_err = 0
-        episode_ori_err = 0
+        episode_pos_err = []
+        episode_ori_err = []
 
         # Track number of episode steps
         steps = 0
@@ -411,10 +416,19 @@ def rollout(
             measurement_self = torch.tensor(measurement_self, dtype=torch.float, requires_grad=False).unsqueeze(dim=0).unsqueeze(dim=0)
             true_self = torch.tensor(true_self, dtype=torch.float, requires_grad=False).unsqueeze(dim=0).unsqueeze(dim=0)
 
+            # squeeze 1st dim (only if we're not using sequences)
+            if not model.requires_sequence:
+                img = torch.squeeze(img, dim=0)
+                measurement_self = torch.squeeze(measurement_self, dim=0)
+                true_self = torch.squeeze(true_self, dim=0)
+
             # Optionally add in depth observations
             if use_depth:
                 depth = obs[params["camera_name"] + "_depth"]
                 depth = depth_transform(depth).float().unsqueeze(dim=0).unsqueeze(dim=0)
+                # squeeze 1st dim (only if we're not using sequences)
+                if not model.requires_sequence:
+                    depth = torch.squeeze(depth, dim=0)
             else:
                 depth = None
 
@@ -423,6 +437,10 @@ def rollout(
                 true_obj = np.concatenate([obs[model.object_name + "_pos"], standardize_quat(obs[model.object_name + "_quat"])])
                 true_obj = torch.tensor(true_obj, dtype=torch.float, requires_grad=False).unsqueeze(
                     dim=0).unsqueeze(dim=0)
+
+                # squeeze 1st dim (only if we're not using sequences)
+                if not model.requires_sequence:
+                    true_obj = torch.squeeze(true_obj, dim=0)
 
                 # Now run forward pass to get estimates
                 obj_out = model(img, depth, measurement_self)
@@ -454,6 +472,10 @@ def rollout(
                 true_other = torch.tensor(true_other, dtype=torch.float, requires_grad=False).unsqueeze(
                     dim=0).unsqueeze(dim=0)
 
+                # squeeze 1st dim (only if we're not using sequences)
+                if not model.requires_sequence:
+                    true_other = torch.squeeze(true_other, dim=0)
+
                 # Now run forward pass to get estimates
                 x0_out, x1_out = model(img, depth, measurement_self)
 
@@ -482,8 +504,9 @@ def rollout(
                     env.move_indicator(model_outputs[global_steps])
 
             # Add error to running error
-            episode_pos_err += pos_err
-            episode_ori_err += ori_err
+            if steps > 10:
+                episode_pos_err.append(pos_err)
+                episode_ori_err.append(ori_err)
 
             # Increment episode step and global step
             steps += 1
@@ -503,4 +526,15 @@ def rollout(
 
         # At the end, print the episode error
         print("EPISODE COMPLETED -- Total Pos/Ori err: {:.3f} m / {:.3f} rad, Per-Step Err: {:.3f} m / {:.3f} rad"
-              .format(episode_pos_err, episode_ori_err, episode_pos_err / steps, episode_ori_err / steps))
+              .format(np.sum(episode_pos_err), np.sum(episode_ori_err), np.average(episode_pos_err), np.average(episode_ori_err)))
+
+        # We also add this episode's errors to the total error vectors
+        total_pos_err += episode_pos_err
+        total_ori_err += episode_ori_err
+
+    # Finally, we print out the total evaluation metrics
+    print()
+    print("*" * 90)
+    print("EVALUATION COMPLETED -- Per-Step Pos Mean/Std Err: {:.5f} / {:.5f} m || Ori Mean/Std Err: {:.5f} / {:.5f} rad"
+          .format(np.average(total_pos_err), np.std(total_pos_err), np.average(total_ori_err), np.std(total_ori_err)))
+    print("*" * 90)

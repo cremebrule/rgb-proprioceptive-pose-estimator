@@ -24,7 +24,7 @@ models = {'n', 'no', 'td', 'tdo'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="n", help="Which mode to run. Options are 'n', 'no', 'td', or 'tdo'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/TemporallyDependentObjectStateEstimator_TwoArmHandoff_40hzn_25000ep_04-06-2020_12-34-59.pth",
+                    default="../log/runs/no_lstm.pth",
                     help="Where to load saved dict for model")
 parser.add_argument("--controller", type=str, default="OSC_POSE", help="Which controller to use in env")
 parser.add_argument("--camera_name", type=str, default="frontview", help="Name of camera to render for observations")
@@ -32,13 +32,14 @@ parser.add_argument("--horizon", type=int, default=100, help="Horizon per episod
 parser.add_argument("--sequence_length", type=int, default=10, help="Sequence length for LSTMs")
 parser.add_argument("--noise_scale", type=float, default=0.001, help="Noise scale for self measurements")
 parser.add_argument("--latent_dim", type=int, default=1024, help="Dimension of output from ResNet")
-parser.add_argument("--hidden_dim", nargs="+", type=int, default=512, help="Hidden dimensions in FC network (naive only), or LSTM net (td/o only)")
+parser.add_argument("--hidden_dim", nargs="+", type=int, default=[512], help="Hidden dimensions in FC network (naive only), or LSTM net (td/o only)")
 parser.add_argument("--env", type=str, default="TwoArmLift", help="Environment to run")
 parser.add_argument("--robots", nargs="+", type=str, default=["Panda", "Sawyer"], help="Which robot(s) to use in the env")
 parser.add_argument("--use_placement_initializer", action="store_true", help="Whether to use custom placement initializer")
 parser.add_argument("--feature_extract", action="store_true", help="Whether ResNet will be set to feature extract mode or not")
 parser.add_argument("--no_proprioception", action="store_true", help="If set, will not leverage proprioceptive measurements during rollout")
 parser.add_argument("--use_depth", action="store_true", help="Whether to use depth or not")
+parser.add_argument("--use_pretrained", action="store_true", help="Whether to usepretrained ResNet or not")
 parser.add_argument("--obj_name", type=str, default=None, help="Object name to generate observations of")
 parser.add_argument("--motion", type=str, default="random", help="Type of robot motion to use")
 parser.add_argument("--model_outputs_file", type=str, default=None, help="Path to model outputs to load")
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     print("Horizon: {}".format(horizon))
     print("Noise Scale: {}".format(noise_scale))
     print()
-    print("*" *  20)
+    print("*" * 20)
 
     # Make sure model is valid
     assert args.model in models, "Error: Invalid model specified. Options are: {}".format(models)

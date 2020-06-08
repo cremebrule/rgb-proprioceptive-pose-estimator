@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from robosuite.utils.transform_utils import quat_distance, quat2axisangle
 
 
@@ -102,6 +103,11 @@ class PoseDistanceLoss(nn.Module):
             # Loop over all quats and compute angle error
             for i in range(predict_ori.shape[0]):
                 _, angle = quat2axisangle(quat_distance(predict_ori[i], true_ori[i]))
+                # Confine the error to be between +/- pi
+                if angle < -np.pi:
+                    angle += 2*np.pi
+                elif angle > np.pi:
+                    angle -= 2*np.pi
                 summed_angle_err += abs(angle)
             # Immediately return the position and orientation errors
             return pos_dist.cpu().detach().numpy(), summed_angle_err
