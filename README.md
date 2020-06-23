@@ -46,6 +46,7 @@ Note that Tensorboard is enabled during training. Thus, ongoing training runs ca
 
 ### Evaluating a Trained Model
 To evaluate a trained model, execute the following:
+
 ```python scripts/rollout.py --model MODEL_PATH [--ARGS...]```
 
 Similar to the training script, please see the source code at [rollout.py](scripts/rollout.py) for a full list and description of each command line argument.
@@ -57,12 +58,15 @@ Examples of output videos for each tested target can be seen at the top of this 
 
 ### Visualizing Model Layers
 To visualize a specific model's layer outputs, execute the following:
+
 ```python scripts/visualize_features.py [--ARGS...]```
 
 where `[--ARGS...]` defines the specific model parameters; similar to the above scripts' arguments. Please see [visualize_features.py](scripts/visualize_features.py) for additional argument information.
 
 Example visualization output from ResNet's BatchNorm1 layer for the Hammer target is shown below:
+
 ![tdo_hammer_bn1_out](visuals/tdo_hammer_bn1_out.png)
 
 and the corresponding Auxiliary layer output from these batchnorm channels for the Hammer target is shown below:
+
 ![tdo_hammer_aux_out](visuals/tdo_hammer_aux_out.png)
