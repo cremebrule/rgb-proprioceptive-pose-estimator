@@ -17,7 +17,7 @@ Visualized results are shown below for each of the above targets, where the red 
 #### Hammer
 ![Hammer Tracker](visuals/hammer_tracker.gif)
 
-#### Cube
+#### Robot EEF
 ![EEF1 Tracker](visuals/eef1_tracker.gif)
 
 
