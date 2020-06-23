@@ -11,7 +11,7 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 # List of available models to train
-models = {'n', 'no', 'td', 'tdo'}
+models = {'n', 'no', 'td', 'tdo', 'tdo_v2'}
 
 # Arguments
 parser = argparse.ArgumentParser()
@@ -23,6 +23,7 @@ parser.add_argument("--sequence_length", type=int, default=10, help="Sequence le
 parser.add_argument("--noise_scale", type=float, default=0.001, help="Noise scale for self measurements")
 parser.add_argument("--latent_dim", type=int, default=1024, help="Dimension of output from ResNet")
 parser.add_argument("--hidden_dim", nargs="+", type=int, default=[512], help="Hidden dimensions in FC network (naive only), or LSTM net (td/o only)")
+parser.add_argument("--proprio_hidden_dim", type=int, default=64, help="Hidden dimensions in proprio LSTM net (tdo_v2 only)")
 parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for Adam optimizer")
 parser.add_argument("--n_train_episodes_per_epoch", type=int, default=10, help="Number of training episodes per epoch")
 parser.add_argument("--n_val_episodes_per_epoch", type=int, default=2, help="Number of validation episodes per epoch")
@@ -130,6 +131,8 @@ if __name__ == '__main__':
     print("Using Proprioception: {}".format(not args.no_proprioception))
     print("Latent Dim: {}".format(args.latent_dim))
     print("Hidden Dim(s): {}".format(args.hidden_dim))
+    if args.model == 'tdo_v2':
+        print("Proprio Hidden Dim: {}".format(args.proprio_hidden_dim))
     print("Sequence Length: {}".format(sequence_length))
     print("Feature Layer Nums: {}".format(feature_layer_nums))
     if args.model == 'n':
@@ -199,6 +202,20 @@ if __name__ == '__main__':
             no_proprioception=args.no_proprioception,
             device=device
         )
+    elif args.model == 'tdo_v2':
+        model = TemporallyDependentObjectStateEstimatorV2(
+            object_name=args.obj_name,
+            img_hidden_dim=args.hidden_dim[0],
+            proprio_hidden_dim=args.proprio_hidden_dim,
+            num_resnet_layers=num_resnet_layers,
+            latent_dim=args.latent_dim,
+            sequence_length=sequence_length,
+            feature_extract=args.feature_extract,
+            feature_layer_nums=feature_layer_nums,
+            use_depth=args.use_depth,
+            use_pretrained=args.use_pretrained,
+            device=device
+        )
 
     else:
         pass
@@ -210,13 +227,6 @@ if __name__ == '__main__':
     # Define optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     param_list = list(model.parameters())
-
-    #summary(model, ((1, 3, 244, 244), (1, 1, 244, 244), (1, 7)))
-
-    # Make sure we're updating the appropriate weights during optimization
-    #for param in param_list:
-    #    if param.requires_grad:
-    #        print("name: {}, shape: {}".format(param.name, param.shape))
 
     # Define the dataset
     print("Loading dataset...")

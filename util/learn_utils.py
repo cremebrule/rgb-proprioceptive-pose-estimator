@@ -504,9 +504,8 @@ def rollout(
                     env.move_indicator(model_outputs[global_steps])
 
             # Add error to running error
-            if steps > 10:
-                episode_pos_err.append(pos_err)
-                episode_ori_err.append(ori_err)
+            episode_pos_err.append(pos_err)
+            episode_ori_err.append(ori_err)
 
             # Increment episode step and global step
             steps += 1

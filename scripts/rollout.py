@@ -24,7 +24,7 @@ models = {'n', 'no', 'td', 'tdo'}
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="n", help="Which mode to run. Options are 'n', 'no', 'td', or 'tdo'")
 parser.add_argument("--model_path", type=str,
-                    default="../log/runs/no_lstm.pth",
+                    default="../log/runs/TemporallyDependentObjectStateEstimator_Lift_20hzn_25000ep_07-06-2020_13-07-19.pth",
                     help="Where to load saved dict for model")
 parser.add_argument("--controller", type=str, default="OSC_POSE", help="Which controller to use in env")
 parser.add_argument("--camera_name", type=str, default="frontview", help="Name of camera to render for observations")
